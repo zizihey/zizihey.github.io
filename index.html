@@ -1,0 +1,1210 @@
+
+<!DOCTYPE html>
+<html lang="ko" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>워크플로우 비즈니스 스케줄러</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Font: Inter & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .calendar-cell:hover .quick-add-btn {
+      opacity: 1;
+    }
+    .badge-work { background-color: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+    .badge-meeting { background-color: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+    .badge-personal { background-color: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .badge-project { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .badge-urgent { background-color: #fee2e2; color: #991b1b; border-color: #fecaca; }
+  </style>
+</head>
+<body class="h-full font-sans text-slate-800 flex flex-col antialiased">
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo and App Title -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <span class="text-lg font-bold text-slate-900 tracking-tight">PlanCraft</span>
+            <span class="ml-2 text-xs font-medium px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">비즈니스 플래너</span>
+          </div>
+        </div>
+
+        <!-- Navigation Controls: Today, Prev, Next, Month Title -->
+        <div class="flex items-center gap-2 sm:gap-4">
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button id="btn-prev" class="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-all shadow-xs" title="이전">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button id="btn-today" class="px-3 py-1 text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-white rounded-lg transition-all shadow-xs">오늘</button>
+            <button id="btn-next" class="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-all shadow-xs" title="다음">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <h2 id="calendar-title" class="text-base sm:text-lg font-bold text-slate-800 min-w-[130px] text-center">2026년 10월</h2>
+        </div>
+
+        <!-- Right Action Items -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- View Toggle (Month / Week) -->
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button id="view-month-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-600 shadow-sm transition-all">월간</button>
+            <button id="view-week-btn" class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all">주간</button>
+          </div>
+
+          <!-- Add Event Button -->
+          <button id="btn-open-create-modal" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm shadow-indigo-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span class="hidden sm:inline">새 일정 등록</span>
+            <span class="sm:hidden">등록</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-1 flex flex-col gap-5 w-full">
+    <!-- Summary Stats Bar -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <!-- Total Month Events -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">이번 달 총 일정</p>
+          <h3 id="stat-total-events" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+      </div>
+
+      <!-- Today's Schedule -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">오늘 예정 일정</p>
+          <h3 id="stat-today-events" class="text-2xl font-bold text-indigo-600 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+      </div>
+
+      <!-- Urgent / High Priority -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">긴급 / 중요 일정</p>
+          <h3 id="stat-urgent-events" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+      </div>
+
+      <!-- Completed Percentage -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">완료 달성률</p>
+          <h3 id="stat-completion-rate" class="text-2xl font-bold text-emerald-600 mt-1">0%</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter, Search and Sample Data Control Bar -->
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <!-- Search Input -->
+      <div class="relative flex-1 min-w-[220px]">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        <input type="text" id="search-input" placeholder="일정 제목 또는 메모 검색..." class="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all">
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div class="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
+        <button data-cat="all" class="filter-pill active px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white transition-all shadow-xs">전체</button>
+        <button data-cat="work" class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">업무/회의</button>
+        <button data-cat="project" class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">프로젝트</button>
+        <button data-cat="personal" class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">개인/약속</button>
+        <button data-cat="urgent" class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">긴급</button>
+      </div>
+
+      <!-- Data Reset & Management Actions -->
+      <div class="flex items-center gap-2">
+        <button id="btn-load-sample" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors border border-indigo-200">
+          샘플 데이터 초기화
+        </button>
+        <button id="btn-clear-all" class="text-xs text-slate-500 hover:text-rose-600 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition-colors border border-slate-200">
+          모두 비우기
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content Workspace (Calendar + Detail Sidebar) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 items-start">
+      <!-- Calendar View Container (8 cols) -->
+      <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col min-h-[580px]">
+        <!-- Days Header (Sun - Sat) -->
+        <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-xs font-bold py-3 text-slate-600">
+          <div class="text-rose-500">일 (SUN)</div>
+          <div>월 (MON)</div>
+          <div>화 (TUE)</div>
+          <div>수 (WED)</div>
+          <div>목 (THU)</div>
+          <div>금 (FRI)</div>
+          <div class="text-blue-500">토 (SAT)</div>
+        </div>
+
+        <!-- Month Grid View -->
+        <div id="month-view-grid" class="grid grid-cols-7 flex-1 auto-rows-fr divide-x divide-y divide-slate-100 bg-slate-100">
+          <!-- Calendar Day Cells generated dynamically -->
+        </div>
+
+        <!-- Week View Container (Hidden initially) -->
+        <div id="week-view-container" class="hidden flex-1 overflow-x-auto p-4 bg-white">
+          <div id="week-grid" class="grid grid-cols-7 gap-3 min-w-[650px] h-full">
+            <!-- Week columns generated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar: Selected Date Details & Action Panel (4 cols) -->
+      <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-5 flex flex-col gap-4 sticky top-20">
+        <!-- Selected Date Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">선택된 날짜</span>
+            <h3 id="sidebar-selected-date" class="text-lg font-bold text-slate-900 mt-0.5">2026년 10월 6일 (화)</h3>
+          </div>
+          <button id="sidebar-quick-add" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            일정 추가
+          </button>
+        </div>
+
+        <!-- Selected Date Event Count -->
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>일정 목록 (<span id="sidebar-day-event-count" class="font-bold text-indigo-600">0</span>개)</span>
+          <span class="text-[11px] text-slate-400">항목 클릭 시 수정</span>
+        </div>
+
+        <!-- Event Cards Container for Selected Date -->
+        <div id="sidebar-event-list" class="flex flex-col gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+          <!-- Dynamic Event Items -->
+        </div>
+
+        <!-- Helper Quick Tip -->
+        <div class="mt-auto pt-3 border-t border-slate-100 flex items-start gap-2.5 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl">
+          <svg class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>달력의 날짜 칸을 클릭하거나 더블 클릭하면 해당 날짜로 즉시 일정을 등록할 수 있습니다.</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Event Create / Edit Modal -->
+  <div id="event-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-all duration-200" id="event-modal-content">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div id="modal-icon-badge" class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          </div>
+          <h3 id="modal-title-text" class="text-base font-bold text-slate-800">새 일정 등록</h3>
+        </div>
+        <button id="modal-close-btn" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Modal Body Form -->
+      <form id="event-form" class="p-6 flex flex-col gap-4">
+        <input type="hidden" id="form-event-id">
+
+        <!-- Title -->
+        <div>
+          <label for="form-title" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">일정 제목 <span class="text-rose-500">*</span></label>
+          <input type="text" id="form-title" required placeholder="예: 4분기 경영 전략 회의" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+        </div>
+
+        <!-- Date & Time Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label for="form-date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">날짜 <span class="text-rose-500">*</span></label>
+            <input type="date" id="form-date" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+          </div>
+          <div>
+            <label for="form-start-time" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">시작 시간</label>
+            <input type="time" id="form-start-time" value="09:00" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+          </div>
+          <div>
+            <label for="form-end-time" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">종료 시간</label>
+            <input type="time" id="form-end-time" value="10:00" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+          </div>
+        </div>
+
+        <!-- Category & Priority Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="form-category" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">카테고리</label>
+            <select id="form-category" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+              <option value="work">업무/회의 (Work)</option>
+              <option value="project">프로젝트 마감 (Project)</option>
+              <option value="personal">개인/약속 (Personal)</option>
+              <option value="urgent">긴급 대응 (Urgent)</option>
+            </select>
+          </div>
+          <div>
+            <label for="form-priority" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">우선순위</label>
+            <select id="form-priority" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all">
+              <option value="medium">보통 (Medium)</option>
+              <option value="high">높음 (High)</option>
+              <option value="urgent">매우 높음 (Critical)</option>
+              <option value="low">낮음 (Low)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Memo / Location -->
+        <div>
+          <label for="form-memo" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">메모 및 비고</label>
+          <textarea id="form-memo" rows="3" placeholder="안건, 회의실 장소 또는 준비물..." class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all resize-none"></textarea>
+        </div>
+
+        <!-- Modal Actions Footer -->
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <button type="button" id="modal-delete-btn" class="px-3.5 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-xl transition-all hidden">
+            일정 삭제
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" id="modal-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all">
+              취소
+            </button>
+            <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-200 transition-all">
+              저장하기
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirmation Dialog (Custom alert replacement) -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs hidden opacity-0 transition-opacity duration-150">
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 max-w-sm w-full shadow-2xl text-center transform scale-95 transition-all duration-150">
+      <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <h3 id="confirm-modal-title" class="text-base font-bold text-slate-900 mb-1">일정을 삭제하시겠습니까?</h3>
+      <p id="confirm-modal-desc" class="text-xs text-slate-500 mb-5">삭제된 일정은 복구되지 않습니다.</p>
+      <div class="flex items-center justify-center gap-3">
+        <button id="confirm-modal-cancel" class="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all">취소</button>
+        <button id="confirm-modal-ok" class="flex-1 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* State Management */
+    const STORAGE_KEY = 'plancraft_scheduler_events_v2';
+    
+    // Default current date anchor
+    let currentDate = new Date(2026, 9, 6); // 2026-10-06 (Month is 0-indexed: 9 = October)
+    let selectedDateStr = '2026-10-06';
+    let currentView = 'month'; // 'month' or 'week'
+    let currentFilterCat = 'all';
+    let searchQuery = '';
+    let confirmCallback = null;
+
+    // Category style dictionary
+    const CATEGORY_MAP = {
+      work: { label: '업무/회의', badgeClass: 'badge-work', dotClass: 'bg-blue-500', icon: '💼' },
+      project: { label: '프로젝트', badgeClass: 'badge-project', dotClass: 'bg-emerald-500', icon: '🚀' },
+      personal: { label: '개인/약속', badgeClass: 'badge-personal', dotClass: 'bg-amber-500', icon: '☕' },
+      urgent: { label: '긴급 대응', badgeClass: 'badge-urgent', dotClass: 'bg-rose-500', icon: '⚡' }
+    };
+
+    const PRIORITY_MAP = {
+      urgent: { label: '긴급', class: 'text-rose-600 bg-rose-50 border-rose-200' },
+      high: { label: '높음', class: 'text-amber-600 bg-amber-50 border-amber-200' },
+      medium: { label: '보통', class: 'text-blue-600 bg-blue-50 border-blue-200' },
+      low: { label: '낮음', class: 'text-slate-600 bg-slate-50 border-slate-200' }
+    };
+
+    function getInitialSampleEvents() {
+      return [
+        {
+          id: 'ev-1',
+          title: '주간 전략 기획 회의',
+          date: '2026-10-06',
+          startTime: '10:00',
+          endTime: '11:30',
+          category: 'work',
+          priority: 'high',
+          memo: '본사 대회의실 A (온오프라인 병행). 4분기 핵심 목표 리뷰.',
+          completed: false
+        },
+        {
+          id: 'ev-2',
+          title: '모바일 클라이언트 2차 배포 QA',
+          date: '2026-10-06',
+          startTime: '14:00',
+          endTime: '16:00',
+          category: 'project',
+          priority: 'urgent',
+          memo: '테스트서버 빌드 1.4.2 검증 및 크래시 리포트 확인.',
+          completed: false
+        },
+        {
+          id: 'ev-3',
+          title: '팀 코퍼릿 런치 미팅',
+          date: '2026-10-06',
+          startTime: '12:00',
+          endTime: '13:00',
+          category: 'personal',
+          priority: 'low',
+          memo: '신규 입사자 환영 점심 식사.',
+          completed: true
+        },
+        {
+          id: 'ev-4',
+          title: '클라우드 인프라 긴급 점검',
+          date: '2026-10-07',
+          startTime: '09:00',
+          endTime: '10:00',
+          category: 'urgent',
+          priority: 'urgent',
+          memo: 'DB 슬레이브 노드 메모리 누수 패치 배포.',
+          completed: false
+        },
+        {
+          id: 'ev-5',
+          title: '디자인 시스템 싱크',
+          date: '2026-10-08',
+          startTime: '15:30',
+          endTime: '16:30',
+          category: 'project',
+          priority: 'medium',
+          memo: 'UI 컴포넌트 라이브러리 Figma 버전 동기화.',
+          completed: false
+        },
+        {
+          id: 'ev-6',
+          title: '파트너사 기술 제휴 미팅',
+          date: '2026-10-12',
+          startTime: '11:00',
+          endTime: '12:00',
+          category: 'work',
+          priority: 'high',
+          memo: 'API 연동 규격서 검토 및 일정 협의.',
+          completed: false
+        },
+        {
+          id: 'ev-7',
+          title: '분기 결산 보고서 제출',
+          date: '2026-10-15',
+          startTime: '17:00',
+          endTime: '18:00',
+          category: 'project',
+          priority: 'urgent',
+          memo: '재무팀 최종 승인 및 전자결재 상신.',
+          completed: false
+        },
+        {
+          id: 'ev-8',
+          title: '헬스 PT 세션',
+          date: '2026-10-09',
+          startTime: '19:00',
+          endTime: '20:00',
+          category: 'personal',
+          priority: 'low',
+          memo: '하체 루틴 및 유산소 30분.',
+          completed: false
+        }
+      ];
+    }
+
+    let events = [];
+
+    function loadEvents() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          events = JSON.parse(stored);
+        } else {
+          events = getInitialSampleEvents();
+          saveEvents();
+        }
+      } catch (e) {
+        console.error('Error loading events:', e);
+        events = getInitialSampleEvents();
+      }
+    }
+
+    function saveEvents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      } catch (e) {
+        console.error('Error saving events:', e);
+      }
+      renderAll();
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const colors = type === 'success' 
+        ? 'bg-emerald-600 text-white shadow-emerald-200' 
+        : type === 'danger'
+        ? 'bg-rose-600 text-white shadow-rose-200'
+        : 'bg-indigo-600 text-white shadow-indigo-200';
+
+      toast.className = `${colors} pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold tracking-wide transform transition-all duration-300 translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span>${escapeHtml(message)}</span>
+      `;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    /* Escape HTML for safety */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* Date format helpers */
+    function formatDateYMD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseDateYMD(str) {
+      const [y, m, d] = str.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+
+    function updateStats() {
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+
+      // Month events
+      const monthEvents = events.filter(e => {
+        const d = parseDateYMD(e.date);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      });
+
+      // Today string
+      const todayStr = formatDateYMD(new Date(2026, 9, 6)); // Default to sample today date
+      const todayEvents = events.filter(e => e.date === todayStr);
+
+      // Urgent/High
+      const urgentEvents = events.filter(e => (e.priority === 'urgent' || e.priority === 'high') && !e.completed);
+
+      // Completion rate
+      const total = monthEvents.length;
+      const completed = monthEvents.filter(e => e.completed).length;
+      const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      document.getElementById('stat-total-events').innerText = total;
+      document.getElementById('stat-today-events').innerText = todayEvents.length;
+      document.getElementById('stat-urgent-events').innerText = urgentEvents.length;
+      document.getElementById('stat-completion-rate').innerText = `${rate}%`;
+    }
+
+    function getFilteredEvents() {
+      return events.filter(ev => {
+        // Category filter
+        if (currentFilterCat !== 'all' && ev.category !== currentFilterCat) {
+          return false;
+        }
+        // Search query
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = ev.title.toLowerCase().includes(q);
+          const matchMemo = (ev.memo || '').toLowerCase().includes(q);
+          if (!matchTitle && !matchMemo) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderMonthView() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      // Title update
+      document.getElementById('calendar-title').innerText = `${year}년 ${month + 1}월`;
+
+      const grid = document.getElementById('month-view-grid');
+      grid.innerHTML = '';
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      const startDayIndex = firstDayOfMonth.getDay(); // 0 is Sun
+      const totalDays = lastDayOfMonth.getDate();
+
+      // Prev month filler
+      const prevMonthLastDate = new Date(year, month, 0).getDate();
+      for (let i = startDayIndex - 1; i >= 0; i--) {
+        const dayNum = prevMonthLastDate - i;
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell min-h-[96px] sm:min-h-[110px] p-2 bg-slate-50/60 text-slate-300 flex flex-col justify-between select-none';
+        cell.innerHTML = `<span class="text-xs font-semibold">${dayNum}</span>`;
+        grid.appendChild(cell);
+      }
+
+      // Filtered events
+      const filtered = getFilteredEvents();
+      const todayStr = formatDateYMD(new Date(2026, 9, 6));
+
+      // Current month days
+      for (let day = 1; day <= totalDays; day++) {
+        const dayDate = new Date(year, month, day);
+        const dayStr = formatDateYMD(dayDate);
+        const isToday = dayStr === todayStr;
+        const isSelected = dayStr === selectedDateStr;
+        const dayOfWeek = dayDate.getDay();
+
+        const cell = document.createElement('div');
+        let cellClasses = 'calendar-cell min-h-[96px] sm:min-h-[110px] p-1.5 sm:p-2 bg-white flex flex-col cursor-pointer transition-colors relative group ';
+        if (isSelected) {
+          cellClasses += 'ring-2 ring-indigo-500 ring-inset bg-indigo-50/30 ';
+        } else {
+          cellClasses += 'hover:bg-slate-50/80 ';
+        }
+        cell.className = cellClasses;
+
+        // Day Number Header
+        const dayEvents = filtered.filter(e => e.date === dayStr);
+
+        let dayColor = 'text-slate-700';
+        if (dayOfWeek === 0) dayColor = 'text-rose-500 font-medium';
+        if (dayOfWeek === 6) dayColor = 'text-blue-500 font-medium';
+
+        let badgeToday = isToday 
+          ? `<span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">${day}</span>`
+          : `<span class="text-xs font-bold ${dayColor} px-1">${day}</span>`;
+
+        // Inner HTML with Quick Add hover button
+        cell.innerHTML = `
+          <div class="flex items-center justify-between mb-1">
+            ${badgeToday}
+            <button class="quick-add-btn opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="이 날짜에 추가">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </button>
+          </div>
+          <div class="events-stack flex flex-col gap-1 overflow-hidden flex-1"></div>
+        `;
+
+        const stack = cell.querySelector('.events-stack');
+
+        // Render mini chips for events (up to 3, then +N more)
+        const maxChips = 3;
+        const visibleEvents = dayEvents.slice(0, maxChips);
+        const overflowCount = dayEvents.length - maxChips;
+
+        visibleEvents.forEach(ev => {
+          const chip = document.createElement('div');
+          const catInfo = CATEGORY_MAP[ev.category] || CATEGORY_MAP.work;
+          const isDoneClass = ev.completed ? 'line-through opacity-60' : '';
+
+          chip.className = `text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-medium truncate flex items-center gap-1 border ${catInfo.badgeClass} ${isDoneClass}`;
+          chip.title = `${ev.startTime} ${ev.title}`;
+          chip.innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full ${catInfo.dotClass} shrink-0"></span>
+            <span class="truncate">${escapeHtml(ev.title)}</span>
+          `;
+          
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditModal(ev.id);
+          });
+
+          stack.appendChild(chip);
+        });
+
+        if (overflowCount > 0) {
+          const overflowBadge = document.createElement('div');
+          overflowBadge.className = 'text-[9px] sm:text-[10px] text-slate-400 font-semibold px-1';
+          overflowBadge.innerText = `+${overflowCount}개 더보기`;
+          stack.appendChild(overflowBadge);
+        }
+
+        // Cell Click: select date
+        cell.addEventListener('click', () => {
+          selectDate(dayStr);
+        });
+
+        // Quick add button click inside cell
+        const quickBtn = cell.querySelector('.quick-add-btn');
+        quickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectDate(dayStr);
+          openCreateModal(dayStr);
+        });
+
+        grid.appendChild(cell);
+      }
+
+      // Next month filler to round to complete grid rows
+      const remainingCells = (7 - ((startDayIndex + totalDays) % 7)) % 7;
+      for (let i = 1; i <= remainingCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell min-h-[96px] sm:min-h-[110px] p-2 bg-slate-50/60 text-slate-300 flex flex-col justify-between select-none';
+        cell.innerHTML = `<span class="text-xs font-semibold">${i}</span>`;
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderWeekView() {
+      const cur = new Date(selectedDateStr || currentDate);
+      const dayOfWeek = cur.getDay();
+      
+      // Calculate start of current week (Sunday)
+      const weekStart = new Date(cur);
+      weekStart.setDate(cur.getDate() - dayOfWeek);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+
+      document.getElementById('calendar-title').innerText = 
+        `${weekStart.getFullYear()}.${weekStart.getMonth()+1}.${weekStart.getDate()} ~ ${weekEnd.getMonth()+1}.${weekEnd.getDate()}`;
+
+      const grid = document.getElementById('week-grid');
+      grid.innerHTML = '';
+
+      const filtered = getFilteredEvents();
+      const todayStr = formatDateYMD(new Date(2026, 9, 6));
+
+      for (let i = 0; i < 7; i++) {
+        const loopDate = new Date(weekStart);
+        loopDate.setDate(weekStart.getDate() + i);
+        const loopDateStr = formatDateYMD(loopDate);
+        const isToday = loopDateStr === todayStr;
+        const isSelected = loopDateStr === selectedDateStr;
+
+        const dayEvents = filtered.filter(e => e.date === loopDateStr);
+        // Sort by start time
+        dayEvents.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+        const col = document.createElement('div');
+        col.className = `flex flex-col rounded-xl border ${isSelected ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-200 bg-slate-50/50'} p-2.5 transition-all`;
+
+        let headerDayColor = 'text-slate-700';
+        if (i === 0) headerDayColor = 'text-rose-500';
+        if (i === 6) headerDayColor = 'text-blue-500';
+
+        col.innerHTML = `
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
+            <div>
+              <span class="text-[11px] font-bold ${headerDayColor}">${DAY_NAMES[i]}</span>
+              <span class="text-sm font-bold ml-1 ${isToday ? 'px-2 py-0.5 rounded-full bg-indigo-600 text-white' : 'text-slate-800'}">${loopDate.getDate()}</span>
+            </div>
+            <button class="week-add-btn text-slate-400 hover:text-indigo-600 p-1 rounded" title="추가">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </button>
+          </div>
+          <div class="week-event-stack flex flex-col gap-2 flex-1 overflow-y-auto max-h-[460px]"></div>
+        `;
+
+        col.addEventListener('click', () => {
+          selectDate(loopDateStr);
+        });
+
+        col.querySelector('.week-add-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectDate(loopDateStr);
+          openCreateModal(loopDateStr);
+        });
+
+        const stack = col.querySelector('.week-event-stack');
+
+        if (dayEvents.length === 0) {
+          stack.innerHTML = `<span class="text-[11px] text-slate-400 text-center py-4">일정 없음</span>`;
+        } else {
+          dayEvents.forEach(ev => {
+            const cat = CATEGORY_MAP[ev.category] || CATEGORY_MAP.work;
+            const item = document.createElement('div');
+            item.className = `p-2 rounded-lg text-xs border ${cat.badgeClass} cursor-pointer hover:shadow-xs transition-shadow flex flex-col gap-1`;
+            item.innerHTML = `
+              <div class="flex items-center justify-between font-semibold">
+                <span class="truncate">${escapeHtml(ev.title)}</span>
+                <span class="text-[10px] opacity-75 shrink-0 ml-1">${ev.startTime || ''}</span>
+              </div>
+              ${ev.memo ? `<p class="text-[11px] opacity-80 line-clamp-2">${escapeHtml(ev.memo)}</p>` : ''}
+            `;
+            item.addEventListener('click', (e) => {
+              e.stopPropagation();
+              openEditModal(ev.id);
+            });
+            stack.appendChild(item);
+          });
+        }
+
+        grid.appendChild(col);
+      }
+    }
+
+    function renderSidebar() {
+      const selectedDate = parseDateYMD(selectedDateStr);
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
+      const day = selectedDate.getDate();
+      const dayName = DAY_NAMES[selectedDate.getDay()];
+
+      document.getElementById('sidebar-selected-date').innerText = `${year}년 ${month}월 ${day}일 (${dayName})`;
+
+      const listContainer = document.getElementById('sidebar-event-list');
+      listContainer.innerHTML = '';
+
+      const filtered = getFilteredEvents();
+      const dayEvents = filtered.filter(e => e.date === selectedDateStr);
+      dayEvents.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+      document.getElementById('sidebar-day-event-count').innerText = dayEvents.length;
+
+      if (dayEvents.length === 0) {
+        listContainer.innerHTML = `
+          <div class="py-12 flex flex-col items-center justify-center text-center text-slate-400">
+            <svg class="w-12 h-12 stroke-1 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <p class="text-xs font-medium">등록된 일정이 없습니다.</p>
+            <button id="sidebar-empty-add-btn" class="mt-3 px-3 py-1.5 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-semibold transition-colors">
+              + 첫 일정 등록하기
+            </button>
+          </div>
+        `;
+        document.getElementById('sidebar-empty-add-btn')?.addEventListener('click', () => {
+          openCreateModal(selectedDateStr);
+        });
+        return;
+      }
+
+      dayEvents.forEach(ev => {
+        const cat = CATEGORY_MAP[ev.category] || CATEGORY_MAP.work;
+        const prio = PRIORITY_MAP[ev.priority] || PRIORITY_MAP.medium;
+
+        const card = document.createElement('div');
+        card.className = `p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-indigo-300 transition-all shadow-xs flex flex-col gap-2 relative group ${ev.completed ? 'opacity-65 bg-slate-50' : ''}`;
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" ${ev.completed ? 'checked' : ''} class="item-checkbox w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+              <h4 class="text-xs sm:text-sm font-bold text-slate-800 leading-snug ${ev.completed ? 'line-through text-slate-400' : ''}">${escapeHtml(ev.title)}</h4>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button class="edit-btn p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-100" title="수정">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </button>
+              <button class="del-btn p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50" title="삭제">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+            <span class="inline-flex items-center gap-1 font-medium text-slate-700">
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              ${ev.startTime || '시간 미지정'} ~ ${ev.endTime || ''}
+            </span>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold border ${cat.badgeClass}">
+              ${cat.icon} ${cat.label}
+            </span>
+            <span class="px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${prio.class}">
+              ${prio.label}
+            </span>
+          </div>
+
+          ${ev.memo ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 mt-0.5 leading-relaxed">${escapeHtml(ev.memo)}</p>` : ''}
+        `;
+
+        // Checkbox complete toggle
+        const checkbox = card.querySelector('.item-checkbox');
+        checkbox.addEventListener('change', () => {
+          ev.completed = checkbox.checked;
+          saveEvents();
+          showToast(ev.completed ? '일정을 완료 처리했습니다.' : '일정을 진행 중으로 변경했습니다.');
+        });
+
+        // Edit button
+        card.querySelector('.edit-btn').addEventListener('click', () => {
+          openEditModal(ev.id);
+        });
+
+        // Delete button
+        card.querySelector('.del-btn').addEventListener('click', () => {
+          confirmAction('일정을 삭제하시겠습니까?', `"${ev.title}" 일정이 영구적으로 삭제됩니다.`, () => {
+            events = events.filter(item => item.id !== ev.id);
+            saveEvents();
+            showToast('일정이 성공적으로 삭제되었습니다.', 'danger');
+          });
+        });
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    function renderAll() {
+      updateStats();
+      if (currentView === 'month') {
+        document.getElementById('month-view-grid').classList.remove('hidden');
+        document.getElementById('week-view-container').classList.add('hidden');
+        renderMonthView();
+      } else {
+        document.getElementById('month-view-grid').classList.add('hidden');
+        document.getElementById('week-view-container').classList.remove('hidden');
+        renderWeekView();
+      }
+      renderSidebar();
+    }
+
+    function selectDate(dateStr) {
+      selectedDateStr = dateStr;
+      const parsed = parseDateYMD(dateStr);
+      // If month changes, align currentDate
+      if (parsed.getMonth() !== currentDate.getMonth() || parsed.getFullYear() !== currentDate.getFullYear()) {
+        currentDate = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+      }
+      renderAll();
+    }
+
+    const modalEl = document.getElementById('event-modal');
+    const modalContent = document.getElementById('event-modal-content');
+    const eventForm = document.getElementById('event-form');
+    const modalTitleText = document.getElementById('modal-title-text');
+    const modalDeleteBtn = document.getElementById('modal-delete-btn');
+
+    function openModal() {
+      modalEl.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        modalEl.classList.remove('opacity-0');
+        modalContent.classList.remove('scale-95');
+      });
+    }
+
+    function closeModal() {
+      modalEl.classList.add('opacity-0');
+      modalContent.classList.add('scale-95');
+      setTimeout(() => {
+        modalEl.classList.add('hidden');
+        eventForm.reset();
+      }, 200);
+    }
+
+    function openCreateModal(defaultDate = null) {
+      document.getElementById('form-event-id').value = '';
+      modalTitleText.innerText = '새 일정 등록';
+      modalDeleteBtn.classList.add('hidden');
+
+      document.getElementById('form-date').value = defaultDate || selectedDateStr;
+      document.getElementById('form-start-time').value = '10:00';
+      document.getElementById('form-end-time').value = '11:00';
+      document.getElementById('form-category').value = 'work';
+      document.getElementById('form-priority').value = 'medium';
+      document.getElementById('form-memo').value = '';
+      document.getElementById('form-title').value = '';
+
+      openModal();
+      setTimeout(() => document.getElementById('form-title').focus(), 150);
+    }
+
+    function openEditModal(eventId) {
+      const ev = events.find(item => item.id === eventId);
+      if (!ev) return;
+
+      document.getElementById('form-event-id').value = ev.id;
+      modalTitleText.innerText = '일정 수정';
+      modalDeleteBtn.classList.remove('hidden');
+
+      document.getElementById('form-title').value = ev.title;
+      document.getElementById('form-date').value = ev.date;
+      document.getElementById('form-start-time').value = ev.startTime || '09:00';
+      document.getElementById('form-end-time').value = ev.endTime || '10:00';
+      document.getElementById('form-category').value = ev.category || 'work';
+      document.getElementById('form-priority').value = ev.priority || 'medium';
+      document.getElementById('form-memo').value = ev.memo || '';
+
+      modalDeleteBtn.onclick = () => {
+        closeModal();
+        confirmAction('일정을 삭제하시겠습니까?', `"${ev.title}" 일정이 영구적으로 삭제됩니다.`, () => {
+          events = events.filter(item => item.id !== ev.id);
+          saveEvents();
+          showToast('일정이 삭제되었습니다.', 'danger');
+        });
+      };
+
+      openModal();
+    }
+
+    eventForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('form-event-id').value;
+      const title = document.getElementById('form-title').value.trim();
+      const date = document.getElementById('form-date').value;
+      const startTime = document.getElementById('form-start-time').value;
+      const endTime = document.getElementById('form-end-time').value;
+      const category = document.getElementById('form-category').value;
+      const priority = document.getElementById('form-priority').value;
+      const memo = document.getElementById('form-memo').value.trim();
+
+      if (!title || !date) {
+        showToast('필수 항목을 모두 입력해주세요.', 'danger');
+        return;
+      }
+
+      if (id) {
+        // Edit existing
+        const index = events.findIndex(ev => ev.id === id);
+        if (index !== -1) {
+          events[index] = {
+            ...events[index],
+            title,
+            date,
+            startTime,
+            endTime,
+            category,
+            priority,
+            memo
+          };
+          showToast('일정이 성공적으로 수정되었습니다.');
+        }
+      } else {
+        // Create new
+        const newEvent = {
+          id: 'ev-' + Date.now(),
+          title,
+          date,
+          startTime,
+          endTime,
+          category,
+          priority,
+          memo,
+          completed: false
+        };
+        events.push(newEvent);
+        showToast('새 일정이 성공적으로 등록되었습니다.');
+      }
+
+      selectedDateStr = date;
+      saveEvents();
+      closeModal();
+    });
+
+    const confirmModalEl = document.getElementById('confirm-modal');
+    const confirmTitleEl = document.getElementById('confirm-modal-title');
+    const confirmDescEl = document.getElementById('confirm-modal-desc');
+    const confirmCancelBtn = document.getElementById('confirm-modal-cancel');
+    const confirmOkBtn = document.getElementById('confirm-modal-ok');
+
+    function confirmAction(title, desc, onConfirm) {
+      confirmTitleEl.innerText = title;
+      confirmDescEl.innerText = desc;
+      confirmCallback = onConfirm;
+
+      confirmModalEl.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        confirmModalEl.classList.remove('opacity-0');
+        confirmModalEl.firstElementChild.classList.remove('scale-95');
+      });
+    }
+
+    function closeConfirmModal() {
+      confirmModalEl.classList.add('opacity-0');
+      confirmModalEl.firstElementChild.classList.add('scale-95');
+      setTimeout(() => {
+        confirmModalEl.classList.add('hidden');
+        confirmCallback = null;
+      }, 150);
+    }
+
+    confirmCancelBtn.addEventListener('click', closeConfirmModal);
+    confirmOkBtn.addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    });
+
+    // Previous & Next navigation
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      if (currentView === 'month') {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+      } else {
+        currentDate.setDate(currentDate.getDate() - 7);
+      }
+      renderAll();
+    });
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (currentView === 'month') {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      } else {
+        currentDate.setDate(currentDate.getDate() + 7);
+      }
+      renderAll();
+    });
+
+    document.getElementById('btn-today').addEventListener('click', () => {
+      currentDate = new Date(2026, 9, 6);
+      selectedDateStr = '2026-10-06';
+      renderAll();
+      showToast('오늘 날짜(2026.10.06)로 이동했습니다.');
+    });
+
+    // View toggle handlers
+    const monthBtn = document.getElementById('view-month-btn');
+    const weekBtn = document.getElementById('view-week-btn');
+
+    monthBtn.addEventListener('click', () => {
+      currentView = 'month';
+      monthBtn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-600 shadow-sm transition-all';
+      weekBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all';
+      renderAll();
+    });
+
+    weekBtn.addEventListener('click', () => {
+      currentView = 'week';
+      weekBtn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-600 shadow-sm transition-all';
+      monthBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all';
+      renderAll();
+    });
+
+    // Header & Sidebar Add buttons
+    document.getElementById('btn-open-create-modal').addEventListener('click', () => {
+      openCreateModal(selectedDateStr);
+    });
+
+    document.getElementById('sidebar-quick-add').addEventListener('click', () => {
+      openCreateModal(selectedDateStr);
+    });
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+
+    // Modal background close
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) closeModal();
+    });
+    confirmModalEl.addEventListener('click', (e) => {
+      if (e.target === confirmModalEl) closeConfirmModal();
+    });
+
+    // Search Input
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      renderAll();
+    });
+
+    // Category filter pills
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(p => {
+          p.classList.remove('active', 'bg-indigo-600', 'text-white');
+          p.classList.add('bg-slate-100', 'text-slate-600');
+        });
+        pill.classList.remove('bg-slate-100', 'text-slate-600');
+        pill.classList.add('active', 'bg-indigo-600', 'text-white');
+
+        currentFilterCat = pill.getAttribute('data-cat');
+        renderAll();
+      });
+    });
+
+    // Sample Data Actions
+    document.getElementById('btn-load-sample').addEventListener('click', () => {
+      confirmAction('샘플 데이터를 복원하시겠습니까?', '기본 샘플 업무 및 미팅 데이터로 재설정됩니다.', () => {
+        events = getInitialSampleEvents();
+        saveEvents();
+        showToast('샘플 데이터가 복원되었습니다.');
+      });
+    });
+
+    document.getElementById('btn-clear-all').addEventListener('click', () => {
+      confirmAction('모든 일정을 비우시겠습니까?', '모든 일정이 초기화되며 빈 캘린더가 됩니다.', () => {
+        events = [];
+        saveEvents();
+        showToast('모든 일정이 삭제되었습니다.', 'danger');
+      });
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadEvents();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
