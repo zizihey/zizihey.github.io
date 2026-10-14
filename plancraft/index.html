@@ -174,6 +174,20 @@
       flex-shrink: 0;
     }
 
+    /* 모바일: 검색·필터 줄은 접어 두고 🔍 버튼으로 펼침 */
+    html.layout-mobile #toolbar-strip:not(.open) {
+      display: none !important;
+    }
+    /* 일정 칩 제목 두 줄까지 */
+    .chip-2line {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      white-space: normal;
+      word-break: break-all;
+    }
+
     html:not(.ledger-on) .ledger-only {
       display: none !important;
     }
@@ -222,6 +236,14 @@
         <button id="btn-today" class="px-2 py-1 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-100">
           오늘
         </button>
+        <button id="btn-mobile-search" type="button" class="mobile-only relative w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 flex items-center justify-center" aria-label="검색·필터">
+          <svg class="w-4.5 h-4.5 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span id="search-active-dot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-brand-600"></span>
+        </button>
+        <button id="btn-mobile-menu" type="button" class="mobile-only relative w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 flex items-center justify-center" aria-label="메뉴" aria-haspopup="true">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          <span id="mobile-menu-dot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500"></span>
+        </button>
 
         <div class="pc-only flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium">
           <button id="view-month-btn" data-view="month" class="view-btn px-2 py-1 rounded bg-white text-brand-600 font-bold shadow-xs">월</button>
@@ -234,12 +256,21 @@
     </div>
   </header>
 
+  <!-- Mobile Menu (⋯) -->
+  <div id="mobile-menu" class="hidden fixed right-3 top-14 z-[45] w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-1.5 flex-col text-sm" role="menu">
+    <button type="button" data-mm="search" class="mm-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left font-semibold text-slate-700"><span class="w-5 text-center">🔍</span><span>검색 · 필터</span></button>
+    <button type="button" data-mm="settings" class="mm-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left font-semibold text-slate-700"><span class="w-5 text-center">👨‍👩‍👧‍👦</span><span id="mm-settings-label">가족 관리</span></button>
+    <button type="button" data-mm="sync" class="mm-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left font-semibold text-slate-700"><span class="w-5 text-center">🔄</span><span id="mm-sync-label">구글 연동</span></button>
+    <button type="button" data-mm="ledger" class="mm-item ledger-only flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left font-semibold text-slate-700"><span class="w-5 text-center">💰</span><span>가계부 설정</span></button>
+    <button type="button" data-mm="trash" class="mm-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left font-semibold text-slate-700"><span class="w-5 text-center">🗑️</span><span class="flex-1">휴지통</span><span id="mm-trash-count" class="hidden px-1.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold"></span></button>
+  </div>
+
   <main class="w-full flex-1 flex flex-col p-2.5 sm:p-4 gap-3 max-w-5xl mx-auto overflow-hidden">
     <!-- Family View Tabs -->
     <nav id="family-tabs" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mb-1 py-0.5" role="tablist" aria-label="가족별 보기"></nav>
 
     <!-- Slim Search & Category Strip (Mobile Optimized) -->
-    <div class="bg-white rounded-xl border border-slate-200/90 p-2 shadow-xs flex flex-col sm:flex-row items-center gap-2">
+    <div id="toolbar-strip" class="bg-white rounded-xl border border-slate-200/90 p-2 shadow-xs flex flex-col sm:flex-row items-center gap-2">
       <!-- Search Input -->
       <div class="relative w-full sm:w-64">
         <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
@@ -644,12 +675,7 @@
             <div>
               <label for="family-color-input" class="block text-[10px] font-bold text-slate-500 mb-1">대표 색상</label>
               <select id="family-color-input" class="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-brand-500 outline-none">
-                <option value="indigo">인디고 / 보라</option>
-                <option value="pink">핑크 / 장미</option>
-                <option value="emerald">에메랄드 / 초록</option>
-                <option value="sky">스카이 / 하늘</option>
-                <option value="amber">앰버 / 주황</option>
-                <option value="slate">슬레이트 / 회색</option>
+                <option value="indigo">남색</option>
               </select>
             </div>
           </div>
@@ -1034,13 +1060,22 @@
 
     // Family Member Dynamic Palette & Styles
     const COLOR_THEMES = {
-      indigo: { bg: '#e0e7ff', text: '#4338ca', border: '#c7d2fe' },
-      pink: { bg: '#fdf2f8', text: '#be185d', border: '#fbcfe8' },
-      emerald: { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' },
-      sky: { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd' },
-      amber: { bg: '#fef3c7', text: '#b45309', border: '#fde68a' },
-      slate: { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1' }
+      indigo: { bg: '#e0e7ff', text: '#4338ca', border: '#c7d2fe', bar: '#6366f1' },
+      pink: { bg: '#fce7f3', text: '#be185d', border: '#fbcfe8', bar: '#ec4899' },
+      emerald: { bg: '#d1fae5', text: '#047857', border: '#a7f3d0', bar: '#10b981' },
+      sky: { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd', bar: '#0ea5e9' },
+      amber: { bg: '#fef3c7', text: '#b45309', border: '#fde68a', bar: '#f59e0b' },
+      slate: { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1', bar: '#64748b' },
+      rose: { bg: '#ffe4e6', text: '#be123c', border: '#fecdd3', bar: '#f43f5e' },
+      orange: { bg: '#ffedd5', text: '#c2410c', border: '#fed7aa', bar: '#f97316' },
+      lime: { bg: '#ecfccb', text: '#4d7c0f', border: '#d9f99d', bar: '#84cc16' },
+      teal: { bg: '#ccfbf1', text: '#0f766e', border: '#99f6e4', bar: '#14b8a6' },
+      violet: { bg: '#ede9fe', text: '#6d28d9', border: '#ddd6fe', bar: '#8b5cf6' },
+      fuchsia: { bg: '#fae8ff', text: '#a21caf', border: '#f5d0fe', bar: '#d946ef' },
+      cyan: { bg: '#cffafe', text: '#0e7490', border: '#a5f3fc', bar: '#06b6d4' },
+      stone: { bg: '#f5f5f4', text: '#44403c', border: '#d6d3d1', bar: '#78716c' }
     };
+    const COLOR_LABELS = { indigo: '남색', pink: '핑크', emerald: '초록', sky: '하늘', amber: '노랑', slate: '회색', rose: '빨강', orange: '주황', lime: '연두', teal: '청록', violet: '보라', fuchsia: '자주', cyan: '민트', stone: '갈색' };
 
     // Default Family Members
     const DEFAULT_FAMILY = [
@@ -1100,6 +1135,7 @@
           name: found.name,
           icon: found.icon || '👤',
           color: found.color,
+          theme,
           style: `background-color: ${theme.bg}; color: ${theme.text}; border-color: ${theme.border};`
         };
       }
@@ -1108,6 +1144,7 @@
         name: '(삭제된 구성원)',
         icon: '👤',
         color: 'slate',
+        theme: COLOR_THEMES.slate,
         style: `background-color: #f1f5f9; color: #334155; border-color: #cbd5e1;`
       };
     }
@@ -1222,6 +1259,8 @@
         container.appendChild(item);
       });
     }
+
+    document.getElementById('family-color-input').innerHTML = Object.keys(COLOR_THEMES).map(c => `<option value="${c}">${COLOR_LABELS[c]}</option>`).join('');
 
     function loadFamilyForEdit(id) {
       const mem = familyMembers.find(m => m.id === id);
@@ -1361,6 +1400,12 @@
       '12-25': '크리스마스'
     };
 
+    // 휴대폰 달력 칸용 짧은 공휴일 이름
+    function shortHolidayName(name) {
+      if (/^대체공휴일/.test(name)) return '대체휴일';
+      return name.replace('설날 연휴', '설연휴').replace('추석 연휴', '추석연휴').replace('부처님오신날', '석가탄신일').replace('대통령선거일', '선거일').replace('지방선거일', '선거일');
+    }
+
     function getHolidayInfo(dateStr) {
       if (KOREA_HOLIDAYS[dateStr]) {
         return KOREA_HOLIDAYS[dateStr];
@@ -1441,6 +1486,11 @@
 
     function updateTrashBadge() {
       const badge = document.getElementById('trash-count-badge');
+      const mmCount = document.getElementById('mm-trash-count');
+      if (mmCount) {
+        mmCount.innerText = trashEvents.length;
+        mmCount.classList.toggle('hidden', trashEvents.length === 0);
+      }
       if (!badge) return;
       if (trashEvents.length > 0) {
         badge.innerText = trashEvents.length;
@@ -1673,6 +1723,7 @@
 
       const filtered = getFilteredEvents();
       const realTodayStr = formatDateYMD(new Date());
+      const isMobileView = window.PlanCraftLayout.isMobile();
 
       // Current month days
       for (let day = 1; day <= totalDays; day++) {
@@ -1684,7 +1735,7 @@
         const holidayName = getHolidayInfo(dayStr);
 
         const cell = document.createElement('div');
-        let cellClasses = 'min-h-[58px] sm:min-h-[75px] p-1 bg-white flex flex-col cursor-pointer transition-colors relative ';
+        let cellClasses = `${isMobileView ? 'min-h-[64px] px-0.5 py-1' : 'min-h-[75px] p-1'} bg-white flex flex-col cursor-pointer transition-colors relative min-w-0 `;
         if (isSelected) {
           cellClasses += 'ring-2 ring-brand-500 ring-inset bg-brand-50/30 ';
         } else {
@@ -1703,41 +1754,60 @@
 
         let badgeToday = isToday 
           ? `<span class="w-5 h-5 rounded-full bg-brand-600 text-white font-bold flex items-center justify-center text-[10px]">${day}</span>`
-          : `<span class="text-[11px] font-bold ${dayColor}">${day}</span>`;
+          : `<span class="${isMobileView ? 'text-[12px]' : 'text-[11px]'} font-bold ${dayColor}">${day}</span>`;
+        const holidayLabel = holidayName ? (isMobileView ? shortHolidayName(holidayName) : holidayName) : '';
 
         cell.innerHTML = `
-          <div class="flex items-center justify-between leading-none mb-1">
+          <div class="flex items-center justify-between leading-none mb-1 px-0.5">
             ${badgeToday}
-            ${dayEvents.length > 0 ? `<span class="text-[9px] text-brand-600 font-bold">${dayEvents.length}</span>` : ''}
+            ${!isMobileView && dayEvents.length > 0 ? `<span class="text-[9px] text-brand-600 font-bold">${dayEvents.length}</span>` : ''}
           </div>
-          ${holidayName ? `<div class="text-[9px] text-rose-500 font-bold leading-tight truncate mb-0.5 px-0.5" title="${escapeHtml(holidayName)}">${escapeHtml(holidayName)}</div>` : ''}
+          ${holidayName ? `<div class="${isMobileView ? 'text-[10px]' : 'text-[9px]'} text-rose-500 font-bold leading-tight truncate mb-0.5 px-0.5" title="${escapeHtml(holidayName)}">${escapeHtml(holidayLabel)}</div>` : ''}
           <div class="events-stack flex flex-col gap-0.5 overflow-hidden flex-1"></div>
         `;
 
         const stack = cell.querySelector('.events-stack');
-        const maxChips = holidayName ? 3 : 4;
+        const maxChips = isMobileView ? (holidayName ? 2 : 3) : (holidayName ? 3 : 4);
         const visibleEvents = dayEvents.slice(0, maxChips);
 
         visibleEvents.forEach(ev => {
           const chip = document.createElement('div');
           const catInfo = CATEGORY_MAP[ev.category] || CATEGORY_MAP.work;
           const isDoneClass = ev.completed ? 'line-through opacity-50' : '';
-          const famInfo = ev.familyMember 
-            ? getFamilyInfo(ev.familyMember) 
-            : null;
-          const famPrefix = famInfo ? `${famInfo.icon} ` : '';
-          const repeatPrefix = (ev.repeatType && ev.repeatType !== 'none') ? '🔁 ' : '';
+          const theme = getFamilyInfo(ev.familyMember || 'me').theme;
+          const multi = isMultiDay(ev);
+          // 색 = 담당자(가족 탭과 같은 색), 왼쪽 띠로 강조
+          chip.style.backgroundColor = theme.bg;
+          chip.style.color = theme.text;
 
-          chip.className = `text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-medium truncate border ${catInfo.badgeClass} ${isDoneClass}`;
-          const multiPrefix = isMultiDay(ev) ? `${multiDayIndexLabel(ev, dayStr)} ` : '';
-          chip.innerText = `${multiPrefix}${repeatPrefix}${famPrefix}${ev.title}`;
-          if (isMultiDay(ev)) chip.classList.add('font-bold');
+          if (isMobileView) {
+            // 휴대폰: 아이콘 없이 제목만, 두 줄까지. 기간 일정은 이어진 막대(첫날·주 시작에만 제목)
+            const showTitle = !multi || ev.date === dayStr || dayOfWeek === 0;
+            const isStartDay = !multi || ev.date === dayStr;
+            const isEndDay = !multi || getEndDate(ev) === dayStr;
+            chip.className = `text-[11px] leading-tight px-1 py-0.5 font-semibold ${multi ? 'truncate -mx-0.5' : 'chip-2line rounded'} ${isDoneClass}`;
+            if (multi) {
+              chip.style.borderTopLeftRadius = chip.style.borderBottomLeftRadius = isStartDay ? '4px' : '0';
+              chip.style.borderTopRightRadius = chip.style.borderBottomRightRadius = isEndDay ? '4px' : '0';
+              if (isStartDay) chip.style.borderLeft = `3px solid ${theme.bar}`;
+            } else {
+              chip.style.borderLeft = `3px solid ${theme.bar}`;
+            }
+            chip.innerText = showTitle ? ev.title : '\u00A0';
+          } else {
+            const repeatPrefix = (ev.repeatType && ev.repeatType !== 'none') ? '🔁 ' : '';
+            const multiPrefix = multi ? `${multiDayIndexLabel(ev, dayStr)} ` : '';
+            chip.className = `text-[10px] px-1 py-0.5 rounded font-medium truncate ${multi ? 'font-bold' : ''} ${isDoneClass}`;
+            chip.style.borderLeft = `3px solid ${theme.bar}`;
+            chip.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full align-middle mr-1 ${catInfo.dotClass}"></span>${escapeHtml(`${multiPrefix}${repeatPrefix}${ev.title}`)}`;
+          }
+          chip.title = ev.title;
           stack.appendChild(chip);
         });
 
         if (dayEvents.length > maxChips) {
           const more = document.createElement('span');
-          more.className = 'text-[8px] text-slate-400 font-semibold leading-none pl-0.5';
+          more.className = `${isMobileView ? 'text-[10px]' : 'text-[8px]'} text-slate-400 font-semibold leading-none pl-0.5`;
           more.innerText = `+${dayEvents.length - maxChips}`;
           stack.appendChild(more);
         }
@@ -1746,7 +1816,7 @@
           const dayExpense = ledgerDayExpense(dayStr);
           if (dayExpense > 0) {
             const money = document.createElement('div');
-            money.className = 'text-[8px] sm:text-[9px] font-bold text-rose-500 leading-none truncate mt-0.5';
+            money.className = `${isMobileView ? 'text-[10px] px-0.5' : 'text-[9px]'} font-bold text-rose-500 leading-none truncate mt-0.5`;
             money.innerText = `-${formatMoneyShort(dayExpense)}`;
             cell.appendChild(money);
           }
@@ -1814,7 +1884,7 @@
             <span class="text-[10px] font-bold ${headerDayColor}">${DAY_NAMES[i]}</span>
             <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center' : (holidayName ? 'text-rose-600 font-bold' : 'text-slate-800')}">${loopDate.getDate()}</span>
           </div>
-          ${holidayName ? `<div class="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded px-1 py-0.5 truncate mb-1 text-center">${escapeHtml(holidayName)}</div>` : ''}
+          ${holidayName ? `<div class="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded px-1 py-0.5 truncate mb-1 text-center" title="${escapeHtml(holidayName)}">${escapeHtml(window.PlanCraftLayout.isMobile() ? shortHolidayName(holidayName) : holidayName)}</div>` : ''}
           <div class="week-event-stack flex flex-col gap-1 flex-1 overflow-y-auto max-h-[300px]"></div>
         `;
 
@@ -1827,16 +1897,17 @@
           stack.innerHTML = `<span class="text-[10px] text-slate-300 text-center py-2">없음</span>`;
         } else {
           dayEvents.forEach(ev => {
-            const cat = CATEGORY_MAP[ev.category] || CATEGORY_MAP.work;
-            const famInfo = ev.familyMember 
-              ? getFamilyInfo(ev.familyMember) 
-              : null;
-            const famPrefix = famInfo ? `${famInfo.icon}` : '';
+            const theme = getFamilyInfo(ev.familyMember || 'me').theme;
             let timeBadge = ev.isAllDay ? '종일' : (ev.startTime ? ev.startTime.slice(0, 5) : '');
-            if (isMultiDay(ev)) timeBadge = multiDayIndexLabel(ev, loopDateStr);
+            if (isMultiDay(ev)) timeBadge = `${multiDayIndexLabel(ev, loopDateStr)}일째`;
             const item = document.createElement('div');
-            item.className = `p-1 rounded text-[10px] border ${cat.badgeClass} font-medium truncate flex items-center gap-1`;
-            item.innerHTML = `<span class="shrink-0 text-[9px] font-semibold ${ev.isAllDay || isMultiDay(ev) ? 'text-brand-600 bg-brand-50 px-1 rounded' : 'text-slate-500'}">${timeBadge}</span><span class="truncate">${famPrefix ? escapeHtml(famPrefix) + ' ' : ''}${escapeHtml(ev.title)}</span>`;
+            // 시간은 윗줄, 제목은 아랫줄(두 줄까지). 색 = 담당자
+            item.className = `px-1 py-0.5 rounded text-[11px] leading-tight font-semibold ${ev.completed ? 'line-through opacity-50' : ''}`;
+            item.style.backgroundColor = theme.bg;
+            item.style.color = theme.text;
+            item.style.borderLeft = `3px solid ${theme.bar}`;
+            item.title = ev.title;
+            item.innerHTML = `<div class="text-[9px] font-bold opacity-75">${escapeHtml(timeBadge)}</div><div class="chip-2line">${escapeHtml(ev.title)}</div>`;
             stack.appendChild(item);
           });
         }
@@ -2308,6 +2379,7 @@
       else renderCompareView();
       renderSidebar();
       renderSidebarLedger();
+      if (typeof updateSearchDot === 'function' && document.getElementById('toolbar-strip')) updateSearchDot();
       if (isGoogleMode()) gcalEnsureRange();
     }
 
@@ -2893,6 +2965,50 @@
       renderAll();
     });
 
+    /* ----- 모바일 상단: 🔍 검색·필터 펼치기, ⋯ 메뉴 ----- */
+    const toolbarStrip = document.getElementById('toolbar-strip');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    function updateSearchDot() {
+      const active = searchQuery.trim() !== '' || currentFilterCat !== 'all';
+      document.getElementById('search-active-dot').classList.toggle('hidden', !active || toolbarStrip.classList.contains('open'));
+    }
+
+    function toggleToolbarStrip(force) {
+      const open = typeof force === 'boolean' ? force : !toolbarStrip.classList.contains('open');
+      toolbarStrip.classList.toggle('open', open);
+      if (open) setTimeout(() => document.getElementById('search-input').focus(), 50);
+      updateSearchDot();
+    }
+
+    function closeMobileMenu() {
+      mobileMenu.classList.add('hidden');
+      mobileMenu.classList.remove('flex');
+    }
+
+    document.getElementById('btn-mobile-search').addEventListener('click', () => toggleToolbarStrip());
+    document.getElementById('btn-mobile-menu').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = mobileMenu.classList.contains('hidden');
+      mobileMenu.classList.toggle('hidden', !willOpen);
+      mobileMenu.classList.toggle('flex', willOpen);
+      if (willOpen) updateGcalUI();
+    });
+    document.addEventListener('click', (e) => {
+      if (!mobileMenu.classList.contains('hidden') && !e.target.closest('#mobile-menu')) closeMobileMenu();
+    });
+    mobileMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-mm]');
+      if (!item) return;
+      closeMobileMenu();
+      const action = item.dataset.mm;
+      if (action === 'search') toggleToolbarStrip(true);
+      else if (action === 'settings') document.getElementById('btn-manage-family').click();
+      else if (action === 'sync') document.getElementById('btn-gcal').click();
+      else if (action === 'ledger') openLedgerSettings();
+      else if (action === 'trash') openTrashModal();
+    });
+
     document.querySelectorAll('.filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('.filter-pill').forEach(p => {
@@ -3060,7 +3176,7 @@
       'https://www.googleapis.com/auth/calendar.calendarlist.readonly'
     ];
     const GCAL_DEFAULT_ICONS = ['👤', '❤️', '🎒', '🧸', '🏡', '👨‍👩‍👧‍👦', '⭐', '🐶'];
-    const GCAL_DEFAULT_COLORS = ['slate', 'pink', 'emerald', 'sky', 'indigo', 'amber'];
+    const GCAL_DEFAULT_COLORS = ['sky', 'pink', 'emerald', 'amber', 'violet', 'orange', 'teal', 'rose', 'lime', 'indigo'];
 
     function getGcalClientId() {
       try {
@@ -3494,7 +3610,30 @@
 
       const famLabel = document.getElementById('btn-manage-family-label');
       if (famLabel) famLabel.innerText = isGoogleMode() ? '캘린더 설정' : '가족 관리';
+      const mmSettings = document.getElementById('mm-settings-label');
+      if (mmSettings) mmSettings.innerText = isGoogleMode() ? '캘린더 설정' : '가족 관리';
+      const mmSync = document.getElementById('mm-sync-label');
+      const disconnected = isGoogleMode() && !gcalConnected() && !gcalSyncing && !gcalBusy;
+      if (mmSync) {
+        mmSync.innerText = !isGoogleMode() ? '구글 연동 설정' : disconnected ? '구글 다시 연결' : `새로고침 (${label.innerText})`;
+        mmSync.parentElement.classList.toggle('text-amber-700', disconnected);
+      }
+      const dot = document.getElementById('mobile-menu-dot');
+      if (dot) dot.classList.toggle('hidden', !disconnected);
     }
+
+    // 1시간마다 만료되는 구글 연결: 앱을 다시 쓰기 시작할 때 첫 터치에서 자동으로 다시 연결
+    let autoReconnectTried = false;
+    document.addEventListener('click', (e) => {
+      if (autoReconnectTried || !isGoogleMode() || gcalConnected() || !getGcalClientId() || familyMembers.length === 0) return;
+      if (e.target.closest('#btn-gcal, [data-mm="sync"], #gcal-connect-btn, [data-action="reconnect"], #gcal-modal, #ledger-settings-modal')) return;
+      autoReconnectTried = true;
+      gcalConnect().then(ok => {
+        if (!ok) return;
+        gcalSync({ force: true });
+        if (ledgerEnabled()) ledgerSync();
+      });
+    }, true);
 
     document.getElementById('btn-gcal').addEventListener('click', async () => {
       if (!isGoogleMode()) return openGcalModal();
@@ -3515,6 +3654,7 @@
     }, 60000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && isGoogleMode()) {
+        if (!gcalConnected()) autoReconnectTried = false;
         if (gcalConnected()) gcalSync({ force: true });
         else updateGcalUI();
         if (ledgerEnabled() && ledgerHasAuth()) ledgerSync();
@@ -3611,7 +3751,7 @@
             <input type="text" class="gcal-icon-input text-center text-base bg-slate-50 border border-slate-200 rounded-lg select-text" maxlength="2" value="${escapeHtml(icon)}" title="아이콘">
             <input type="text" class="gcal-name-input px-2 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg select-text" value="${escapeHtml(name)}" placeholder="담당자 이름">
             <select class="gcal-color-input px-1 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg">
-              ${Object.keys(COLOR_THEMES).map(c => `<option value="${c}" ${c === color ? 'selected' : ''}>${{ indigo: '보라', pink: '핑크', emerald: '초록', sky: '하늘', amber: '주황', slate: '회색' }[c]}</option>`).join('')}
+              ${Object.keys(COLOR_THEMES).map(c => `<option value="${c}" ${c === color ? 'selected' : ''}>${COLOR_LABELS[c]}</option>`).join('')}
             </select>
           </div>
           <label class="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer">
