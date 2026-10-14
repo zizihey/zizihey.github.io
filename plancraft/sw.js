@@ -1,5 +1,5 @@
 /* PlanCraft 서비스 워커: 앱 화면을 기기에 저장해 두어 빠르게 열리고, 인터넷이 끊겨도 마지막 화면을 볼 수 있게 함 */
-const CACHE = 'plancraft-v1';
+const CACHE = 'plancraft-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
 const CDN_HOSTS = ['cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -23,7 +23,8 @@ self.addEventListener('fetch', (event) => {
   // 앱 화면(HTML): 항상 최신 버전을 먼저 받고, 실패하면 저장된 화면
   if (req.mode === 'navigate' || (url.origin === self.location.origin && url.pathname.endsWith('/index.html'))) {
     event.respondWith(
-      fetch(req)
+      // 브라우저 임시 저장(최대 10분)을 건너뛰고 항상 서버의 최신 화면을 확인
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((cache) => cache.put('./index.html', copy));
