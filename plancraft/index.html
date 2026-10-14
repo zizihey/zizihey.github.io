@@ -895,6 +895,47 @@
     </div>
   </div>
 
+  <!-- Ledger Options Modal (분류·결제수단 편집) -->
+  <div id="ledger-options-modal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs hidden opacity-0 transition-opacity duration-200">
+    <div id="ledger-options-content" class="bg-white rounded-t-3xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden transform translate-y-6 sm:translate-y-0 sm:scale-95 transition-all duration-200 flex flex-col max-h-[92vh]">
+      <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+        <h3 class="text-sm font-bold text-slate-800">🏷️ 분류·결제수단 편집</h3>
+        <button type="button" id="ledger-options-close-btn" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto flex flex-col gap-3">
+        <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button type="button" data-opt-kind="expense" class="opt-kind-btn py-1.5 rounded-lg">지출 분류</button>
+          <button type="button" data-opt-kind="income" class="opt-kind-btn py-1.5 rounded-lg">수입 분류</button>
+          <button type="button" data-opt-kind="payment" class="opt-kind-btn py-1.5 rounded-lg">결제수단</button>
+        </div>
+
+        <!-- 추가 / 수정 -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span id="opt-form-title" class="text-xs font-bold text-slate-700">+ 새 항목 추가</span>
+            <button type="button" id="opt-form-reset" class="hidden text-[10px] text-slate-400 hover:text-slate-600">수정 취소</button>
+          </div>
+          <input type="hidden" id="opt-edit-name">
+          <div class="flex items-center gap-2">
+            <input type="text" id="opt-icon" maxlength="8" value="📦" class="w-12 h-10 text-center text-xl bg-white border-2 border-brand-500 rounded-xl outline-none shrink-0 select-text" title="아이콘 (아래에서 누르거나 직접 입력)">
+            <input type="text" id="opt-name" maxlength="20" placeholder="이름 (예: 반려동물)" class="flex-1 min-w-0 px-2.5 py-2 text-xs bg-white border border-slate-300 rounded-xl outline-none select-text">
+            <button type="button" id="opt-save" class="shrink-0 px-3 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl">추가</button>
+          </div>
+          <div id="opt-emoji-grid" class="bg-white border border-slate-200 rounded-xl p-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5 text-base text-center"></div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold text-slate-500">목록 (위에서부터 표시 순서)</span>
+          <span id="opt-saving" class="hidden text-[10px] text-brand-600 font-semibold">저장 중…</span>
+        </div>
+        <div id="opt-list" class="flex flex-col gap-1"></div>
+        <p class="text-[10px] text-slate-400 leading-snug">숨긴 항목은 새로 기록할 때 보이지 않지만, 예전 기록은 그대로 남습니다. 바꾼 내용은 가계부 시트의 '설정' 탭에 저장되어 배우자 앱에도 반영됩니다.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Trash Bin Modal (휴지통 모달) -->
   <div id="trash-modal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs hidden opacity-0 transition-opacity duration-200">
     <div id="trash-modal-content" class="bg-white rounded-t-3xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden transform translate-y-6 sm:translate-y-0 sm:scale-95 transition-all duration-200 flex flex-col max-h-[85vh]">
@@ -2731,10 +2772,18 @@
     const confirmCancelBtn = document.getElementById('confirm-modal-cancel');
     const confirmOkBtn = document.getElementById('confirm-modal-ok');
 
-    function confirmAction(title, desc, onConfirm) {
+    let confirmCancelCallback = null;
+    let confirmSeq = 0;
+
+    function confirmAction(title, desc, onConfirm, options = {}) {
+      confirmSeq++;
       confirmTitleEl.innerText = title;
       confirmDescEl.innerText = desc;
       confirmCallback = onConfirm;
+      confirmCancelCallback = options.onCancel || null;
+      confirmOkBtn.innerText = options.okLabel || '확인';
+      confirmCancelBtn.innerText = options.cancelLabel || '취소';
+      confirmOkBtn.className = `flex-1 py-1.5 text-xs font-semibold text-white ${options.okClass || 'bg-rose-600 hover:bg-rose-700'} rounded-lg shadow-xs`;
 
       confirmModalEl.classList.remove('hidden');
       requestAnimationFrame(() => {
@@ -2744,18 +2793,26 @@
     }
 
     function closeConfirmModal() {
+      const seq = confirmSeq;
       confirmModalEl.classList.add('opacity-0');
       confirmModalEl.firstElementChild.classList.add('scale-95');
       setTimeout(() => {
+        if (seq !== confirmSeq) return; // 그사이 새 확인 창이 열렸으면 건드리지 않음
         confirmModalEl.classList.add('hidden');
         confirmCallback = null;
+        confirmCancelCallback = null;
       }, 150);
     }
 
-    confirmCancelBtn.addEventListener('click', closeConfirmModal);
-    confirmOkBtn.addEventListener('click', () => {
-      if (confirmCallback) confirmCallback();
+    confirmCancelBtn.addEventListener('click', () => {
+      const onCancel = confirmCancelCallback;
       closeConfirmModal();
+      if (onCancel) onCancel();
+    });
+    confirmOkBtn.addEventListener('click', () => {
+      const onConfirm = confirmCallback;
+      closeConfirmModal();
+      if (onConfirm) onConfirm();
     });
 
     // Month Navigation
@@ -3684,13 +3741,28 @@
     };
     const TX_SHEET = '거래내역';
     const FIXED_SHEET = '고정비';
+    const SETTINGS_SHEET = '설정';
+    const SETTINGS_HEADERS = ['구분', '이름', '아이콘', '순서', '사용'];
+    const LEDGER_STRUCTURE_VERSION = 2; // 설정 탭·열 숨김·드롭다운·서식
+    const OPTION_KIND_LABEL = { expense: '지출', income: '수입', payment: '결제수단' };
+    const OPTION_KIND_BY_LABEL = { 지출: 'expense', 수입: 'income', 결제수단: 'payment' };
     const TX_HEADERS = ['ID', '날짜', '구분', '금액', '분류', '결제수단', '담당자', '담당자ID', '내용', '메모', '고정비ID', '연결일정', '등록일시', '수정일시'];
     const FIXED_HEADERS = ['ID', '이름', '구분', '금액', '분류', '결제수단', '담당자', '담당자ID', '주기', '기준일', '시작월', '종료월', '사용', '메모', '수정일시'];
     const LEDGER_CATS = {
       expense: [['식비', '🍚'], ['카페·간식', '☕'], ['생활용품', '🧴'], ['주거·관리비', '🏠'], ['통신', '📱'], ['교통·차량', '🚗'], ['교육·학원', '📚'], ['의료·건강', '💊'], ['보험', '🛡️'], ['경조사·선물', '🎁'], ['여가·여행', '✈️'], ['쇼핑·의류', '👕'], ['용돈', '💵'], ['세금·공과금', '🧾'], ['저축·투자', '🏦'], ['기타', '📦']],
       income: [['급여', '💼'], ['부수입', '💰'], ['용돈·선물', '🎁'], ['이자·투자', '📈'], ['환급·기타', '↩️']]
     };
-    const LEDGER_PAYMENTS = ['현금', '체크카드', '신용카드', '계좌이체', '간편결제', '형제통장', '기타'];
+    const LEDGER_PAYMENTS = [['현금', '💵'], ['체크카드', '💳'], ['신용카드', '💳'], ['계좌이체', '🏦'], ['간편결제', '📱'], ['형제통장', '👫'], ['기타', '📦']];
+    const OPTION_EMOJIS = ['🍚', '🍜', '🍔', '🍕', '☕', '🍰', '🍺', '🛒', '🧴', '🧻', '🧹', '🏠', '💡', '💧', '🔥', '📱', '💻', '📺', '🚗', '⛽', '🚌', '🚕', '🅿️', '🚲', '📚', '✏️', '🎓', '🎨', '🎹', '⚽', '🏋️', '💊', '🏥', '🦷', '👓', '🛡️', '🎁', '💐', '🎂', '💍', '✈️', '🏖️', '🏕️', '🎬', '🎮', '🎤', '👕', '👟', '👜', '💄', '💇', '🐶', '🐱', '👶', '🧸', '👴', '💵', '💳', '🏦', '💰', '💼', '📈', '🧾', '🏛️', '📦', '↩️', '🔧', '🌱', '⭐', '❤️', '👫', '👨‍👩‍👧‍👦'];
+
+    function defaultLedgerOptions() {
+      const list = [];
+      const push = (kind, items) => items.forEach(([name, icon], i) => list.push({ kind, name, icon, order: i + 1, active: true }));
+      push('expense', LEDGER_CATS.expense);
+      push('income', LEDGER_CATS.income);
+      push('payment', LEDGER_PAYMENTS);
+      return list;
+    }
 
     let ledgerSheet = null; // { id, title, txSheetId, fixedSheetId }
     let ledgerTx = [];
@@ -3700,6 +3772,7 @@
     let ledgerLastSync = null;
     let ledgerError = '';
     let ledgerTab = 'list';
+    let ledgerOptions = defaultLedgerOptions();
 
     try {
       ledgerSheet = JSON.parse(localStorage.getItem(LEDGER_KEYS.sheet) || 'null');
@@ -3707,6 +3780,7 @@
       if (cache && ledgerSheet && cache.sheetId === ledgerSheet.id) {
         ledgerTx = Array.isArray(cache.tx) ? cache.tx : [];
         ledgerFixed = Array.isArray(cache.fixed) ? cache.fixed : [];
+        if (Array.isArray(cache.options) && cache.options.length) ledgerOptions = cache.options;
       }
       ledgerTab = localStorage.getItem(LEDGER_KEYS.tab) || 'list';
     } catch (e) {}
@@ -3767,9 +3841,17 @@
       });
     }
 
+    // 사용 중인 항목만, 순서대로 → [[이름, 아이콘], ...]
+    function ledgerOptionList(kind, includeHidden = false) {
+      return ledgerOptions
+        .filter(o => o.kind === kind && (includeHidden || o.active))
+        .sort((a, b) => a.order - b.order)
+        .map(o => [o.name, o.icon || '📦']);
+    }
+
     function ledgerCatIcon(kind, label) {
-      const found = (LEDGER_CATS[kind] || []).find(c => c[0] === label);
-      return found ? found[1] : '📦';
+      const found = ledgerOptions.find(o => o.kind === kind && o.name === label);
+      return found ? (found.icon || '📦') : '📦';
     }
 
     function newLedgerId(prefix) {
@@ -3795,15 +3877,46 @@
     }
 
     /* ----- 시트 행 ↔ 데이터 ----- */
+    const SHEET_EPOCH = Date.UTC(1899, 11, 30);
+
+    // 시트 날짜형(일련번호) ↔ 'YYYY-MM-DD'
+    function serialToDate(serial) {
+      const d = new Date(SHEET_EPOCH + Math.round(Number(serial)) * 86400000);
+      return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    }
+
+    function dateToSerial(dateStr) {
+      const [y, m, d] = String(dateStr).split('-').map(Number);
+      return Math.round((Date.UTC(y, m - 1, d) - SHEET_EPOCH) / 86400000);
+    }
+
+    function normalizeSheetDate(v) {
+      if (v === '' || v === null || v === undefined) return '';
+      if (typeof v === 'number') return serialToDate(v);
+      const m = /^(\d{4})[-./ ]\s*(\d{1,2})[-./ ]\s*(\d{1,2})/.exec(String(v).trim());
+      return m ? `${m[1]}-${pad2(m[2])}-${pad2(m[3])}` : '';
+    }
+
+    function normalizeSheetMonth(v) {
+      if (v === '' || v === null || v === undefined) return '';
+      if (typeof v === 'number') return serialToDate(v).slice(0, 7);
+      const m = /^(\d{4})[-./ ]\s*(\d{1,2})/.exec(String(v).trim());
+      return m ? `${m[1]}-${pad2(m[2])}` : '';
+    }
+
+    function sheetAmount(v) {
+      return typeof v === 'number' ? Math.round(v) : parseMoney(v);
+    }
+
     function rowToTx(r) {
       return {
         id: String(r[0] || ''),
-        date: String(r[1] || ''),
-        kind: r[2] === '수입' ? 'income' : 'expense',
-        amount: Number(r[3]) || 0,
-        category: String(r[4] || '기타'),
-        payment: String(r[5] || ''),
-        ownerName: String(r[6] || ''),
+        date: normalizeSheetDate(r[1]),
+        kind: String(r[2] || '').trim() === '수입' ? 'income' : 'expense',
+        amount: sheetAmount(r[3]),
+        category: String(r[4] || '').trim() || '기타',
+        payment: String(r[5] || '').trim(),
+        ownerName: String(r[6] || '').trim(),
         ownerId: String(r[7] || ''),
         desc: String(r[8] || ''),
         memo: String(r[9] || ''),
@@ -3815,24 +3928,36 @@
     }
 
     function txToRow(t) {
-      return [t.id, t.date, t.kind === 'income' ? '수입' : '지출', Number(t.amount) || 0, t.category, t.payment, t.ownerName, t.ownerId, t.desc, t.memo, t.fixedId || '', t.eventId || '', t.createdAt, t.updatedAt];
+      return [t.id, dateToSerial(t.date), t.kind === 'income' ? '수입' : '지출', Number(t.amount) || 0, t.category, t.payment, t.ownerName, t.ownerId, t.desc, t.memo, t.fixedId || '', t.eventId || '', t.createdAt, t.updatedAt];
     }
 
     function rowToFixed(r) {
+      const cycle = String(r[8] || '').trim() === '매년' ? '매년' : '매월';
+      let day = r[9];
+      if (cycle === '매년') {
+        // 'MM-DD' / 시트 날짜형 / '10월 1일' 모두 허용
+        if (typeof day === 'number' && day > 31) day = serialToDate(day).slice(5);
+        else {
+          const m = /(\d{1,2})\D+(\d{1,2})/.exec(String(day || ''));
+          day = m ? `${pad2(m[1])}-${pad2(m[2])}` : '01-01';
+        }
+      } else {
+        day = String(Math.min(31, Math.max(1, parseInt(String(day || '1').replace(/[^0-9]/g, ''), 10) || 1)));
+      }
       return {
         id: String(r[0] || ''),
-        name: String(r[1] || ''),
-        kind: r[2] === '수입' ? 'income' : 'expense',
-        amount: Number(r[3]) || 0,
-        category: String(r[4] || '기타'),
-        payment: String(r[5] || ''),
-        ownerName: String(r[6] || ''),
+        name: String(r[1] || '').trim(),
+        kind: String(r[2] || '').trim() === '수입' ? 'income' : 'expense',
+        amount: sheetAmount(r[3]),
+        category: String(r[4] || '').trim() || '기타',
+        payment: String(r[5] || '').trim(),
+        ownerName: String(r[6] || '').trim(),
         ownerId: String(r[7] || ''),
-        cycle: r[8] === '매년' ? '매년' : '매월',
-        day: String(r[9] || '1'),
-        start: String(r[10] || ''),
-        end: String(r[11] || ''),
-        active: r[12] !== 'N',
+        cycle,
+        day,
+        start: normalizeSheetMonth(r[10]),
+        end: normalizeSheetMonth(r[11]),
+        active: String(r[12] || '').trim().toUpperCase() !== 'N',
         memo: String(r[13] || ''),
         updatedAt: String(r[14] || '')
       };
@@ -3852,18 +3977,48 @@
       }
       ledgerSyncing = true;
       try {
-        const res = await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchGet?ranges=${ledgerRange(TX_SHEET, 'A2:N')}&ranges=${ledgerRange(FIXED_SHEET, 'A2:O')}&valueRenderOption=UNFORMATTED_VALUE`);
+        await ledgerEnsureStructure();
+        const res = await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchGet?ranges=${ledgerRange(TX_SHEET, 'A2:N')}&ranges=${ledgerRange(FIXED_SHEET, 'A2:O')}&ranges=${ledgerRange(SETTINGS_SHEET, 'A2:E')}&valueRenderOption=UNFORMATTED_VALUE`);
         const ranges = (res && res.valueRanges) || [];
-        const tx = ((ranges[0] && ranges[0].values) || []).filter(r => r[0]).map(rowToTx);
-        const fixed = ((ranges[1] && ranges[1].values) || []).filter(r => r[0]).map(rowToFixed);
-        const changed = JSON.stringify([tx, fixed]) !== JSON.stringify([ledgerTx, ledgerFixed]);
+        const txRows = (ranges[0] && ranges[0].values) || [];
+        const fixedRows = (ranges[1] && ranges[1].values) || [];
+
+        // 시트에 직접 입력해 ID가 비어 있는 행: 자동으로 ID를 붙여 시트에 기록
+        const idUpdates = [];
+        txRows.forEach((r, i) => {
+          if (!r[0] && normalizeSheetDate(r[1]) && sheetAmount(r[3])) {
+            r[0] = newLedgerId('tx');
+            idUpdates.push({ range: `'${TX_SHEET}'!A${i + 2}`, values: [[r[0]]] });
+          }
+        });
+        fixedRows.forEach((r, i) => {
+          if (!r[0] && String(r[1] || '').trim() && sheetAmount(r[3])) {
+            r[0] = newLedgerId('fx');
+            idUpdates.push({ range: `'${FIXED_SHEET}'!A${i + 2}`, values: [[r[0]]] });
+          }
+        });
+        if (idUpdates.length) {
+          try {
+            await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchUpdate`, { method: 'POST', body: { valueInputOption: 'RAW', data: idUpdates } });
+          } catch (e) {
+            console.warn('Failed to assign ledger IDs:', e);
+          }
+        }
+
+        const tx = txRows.filter(r => r[0] && normalizeSheetDate(r[1])).map(rowToTx);
+        const fixed = fixedRows.filter(r => r[0] && String(r[1] || '').trim()).map(rowToFixed);
+        const options = ((ranges[2] && ranges[2].values) || []).map(rowToOption).filter(Boolean);
+        const nextOptions = options.length ? options : defaultLedgerOptions();
+        const changed = JSON.stringify([tx, fixed, nextOptions]) !== JSON.stringify([ledgerTx, ledgerFixed, ledgerOptions]);
         ledgerTx = tx;
         ledgerFixed = fixed;
+        ledgerOptions = nextOptions;
         ledgerLastSync = new Date();
         ledgerError = '';
         try {
-          localStorage.setItem(LEDGER_KEYS.cache, JSON.stringify({ sheetId: ledgerSheet.id, tx, fixed, at: ledgerLastSync.toISOString() }));
+          localStorage.setItem(LEDGER_KEYS.cache, JSON.stringify({ sheetId: ledgerSheet.id, tx, fixed, options: nextOptions, at: ledgerLastSync.toISOString() }));
         } catch (e) {}
+        if (changed && !ledgerOptionsModalEl.classList.contains('hidden')) renderOptionsEditor();
         if (changed) renderAll();
         else if (currentView === 'ledger') renderLedgerView();
       } catch (e) {
@@ -4268,8 +4423,12 @@
     }
 
     function fillPaymentSelect(select, value) {
-      select.innerHTML = LEDGER_PAYMENTS.map(p => `<option value="${p}">${p}</option>`).join('');
-      select.value = LEDGER_PAYMENTS.includes(value) ? value : LEDGER_PAYMENTS[0];
+      const list = ledgerOptionList('payment');
+      // 숨기거나 목록에 없는 결제수단으로 남은 예전 기록도 그대로 수정할 수 있게 포함
+      if (value && !list.some(p => p[0] === value)) list.push([value, ledgerCatIcon('payment', value)]);
+      if (list.length === 0) list.push(['기타', '📦']);
+      select.innerHTML = list.map(([name, icon]) => `<option value="${escapeHtml(name)}">${escapeHtml(icon)} ${escapeHtml(name)}</option>`).join('');
+      select.value = value && list.some(p => p[0] === value) ? value : list[0][0];
     }
 
     /* ----- 가계부 기록 창 ----- */
@@ -4287,10 +4446,11 @@
         const active = btn.dataset.kind === kind;
         btn.className = `ledger-kind-btn py-1.5 rounded-lg ${active ? (kind === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'text-slate-500'}`;
       });
-      const cats = LEDGER_CATS[kind];
+      const cats = ledgerOptionList(kind);
+      if (cats.length === 0) cats.push(['기타', '📦']);
       ledgerCategory = cats.some(c => c[0] === category) ? category : (category || cats[0][0]);
       const grid = document.getElementById('ledger-cat-grid');
-      const extra = cats.some(c => c[0] === ledgerCategory) ? [] : [[ledgerCategory, '📦']];
+      const extra = cats.some(c => c[0] === ledgerCategory) ? [] : [[ledgerCategory, ledgerCatIcon(kind, ledgerCategory)]];
       grid.innerHTML = cats.concat(extra).map(([label, icon]) => `<button type="button" data-cat="${escapeHtml(label)}" class="ledger-cat-btn flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-[10px] font-semibold ${label === ledgerCategory ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}"><span class="text-base leading-none">${icon}</span><span class="truncate max-w-full px-0.5">${escapeHtml(label)}</span></button>`).join('');
     }
 
@@ -4409,11 +4569,13 @@
         const active = btn.dataset.kind === kind;
         btn.className = `fixed-kind-btn py-1.5 rounded-lg ${active ? (kind === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'text-slate-500'}`;
       });
-      const cats = LEDGER_CATS[kind].map(c => c[0]);
+      const cats = ledgerOptionList(kind).map(c => c[0]);
       if (category && !cats.includes(category)) cats.push(category);
+      if (cats.length === 0) cats.push('기타');
       const select = document.getElementById('fixed-category');
-      select.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${ledgerCatIcon(kind, c)} ${escapeHtml(c)}</option>`).join('');
-      select.value = category && cats.includes(category) ? category : (kind === 'income' ? '급여' : '주거·관리비');
+      select.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(ledgerCatIcon(kind, c))} ${escapeHtml(c)}</option>`).join('');
+      const preferred = kind === 'income' ? '급여' : '주거·관리비';
+      select.value = category && cats.includes(category) ? category : (cats.includes(preferred) ? preferred : cats[0]);
     }
 
     document.querySelectorAll('.fixed-kind-btn').forEach(btn => btn.addEventListener('click', () => setFixedKind(btn.dataset.kind)));
@@ -4566,6 +4728,13 @@
             <button type="button" data-ls="copy" data-url="${url}" class="shrink-0 px-2 py-1 text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">복사</button>
           </div>
         </div>
+        <button type="button" data-ls="options" class="flex items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 hover:border-brand-300 text-left">
+          <span>
+            <span class="block text-xs font-bold text-slate-700">🏷️ 분류·결제수단 편집</span>
+            <span class="block text-[10px] text-slate-400">추가 · 이름 변경 · 순서 · 숨기기 (부부 공통)</span>
+          </span>
+          <span class="text-brand-600 text-xs font-bold">편집 ›</span>
+        </button>
         <label class="flex items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer">
           <span class="text-xs font-semibold text-slate-700">월간 달력에 하루 지출 합계 표시</span>
           <input type="checkbox" data-ls="oncal" class="w-4 h-4 rounded text-brand-600" ${ledgerShowOnCalendar() ? 'checked' : ''}>
@@ -4605,12 +4774,13 @@
           properties: { title: 'PlanCraft 가계부', locale: 'ko_KR', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul' },
           sheets: [
             { properties: { title: TX_SHEET, gridProperties: { frozenRowCount: 1 } }, data: [{ startRow: 0, startColumn: 0, rowData: headerRow(TX_HEADERS) }] },
-            { properties: { title: FIXED_SHEET, gridProperties: { frozenRowCount: 1 } }, data: [{ startRow: 0, startColumn: 0, rowData: headerRow(FIXED_HEADERS) }] }
+            { properties: { title: FIXED_SHEET, gridProperties: { frozenRowCount: 1 } }, data: [{ startRow: 0, startColumn: 0, rowData: headerRow(FIXED_HEADERS) }] },
+            { properties: { title: SETTINGS_SHEET, gridProperties: { frozenRowCount: 1 } }, data: [{ startRow: 0, startColumn: 0, rowData: headerRow(SETTINGS_HEADERS).concat(optionRowData(defaultLedgerOptions())) }] }
           ]
         }
       });
       const byTitle = t => res.sheets.find(sh => sh.properties.title === t).properties.sheetId;
-      return { id: res.spreadsheetId, title: res.properties.title, txSheetId: byTitle(TX_SHEET), fixedSheetId: byTitle(FIXED_SHEET) };
+      return { id: res.spreadsheetId, title: res.properties.title, txSheetId: byTitle(TX_SHEET), fixedSheetId: byTitle(FIXED_SHEET), settingsSheetId: byTitle(SETTINGS_SHEET) };
     }
 
     async function linkLedgerSheet(input) {
@@ -4634,6 +4804,10 @@
         } catch (err) {
           showToast('복사하지 못했습니다. 주소를 길게 눌러 복사해 주세요.', 'danger');
         }
+        return;
+      }
+      if (action === 'options') {
+        openOptionsEditor();
         return;
       }
       if (action === 'unlink') {
@@ -4677,6 +4851,330 @@
         localStorage.setItem(LEDGER_KEYS.onCalendar, e.target.checked ? '1' : '0');
       } catch (err) {}
       renderAll();
+    });
+
+
+    /* ===================== 🏷️ 분류·결제수단 (시트 '설정' 탭) ===================== */
+    function rowToOption(r, i) {
+      const kind = OPTION_KIND_BY_LABEL[String(r[0] || '').trim()];
+      const name = String(r[1] || '').trim();
+      if (!kind || !name) return null;
+      return {
+        kind,
+        name,
+        icon: String(r[2] || '').trim() || '📦',
+        order: Number(r[3]) || i + 1,
+        active: String(r[4] || '').trim().toUpperCase() !== 'N'
+      };
+    }
+
+    function optionToRow(o) {
+      return [OPTION_KIND_LABEL[o.kind], o.name, o.icon || '📦', o.order, o.active ? 'Y' : 'N'];
+    }
+
+    function optionRowData(options) {
+      return options.map(o => ({ values: optionToRow(o).map(v => (typeof v === 'number' ? { userEnteredValue: { numberValue: v } } : { userEnteredValue: { stringValue: String(v) } })) }));
+    }
+
+    // 목록에서 고르기(드롭다운) 규칙. 목록에 없는 값도 입력은 허용(경고만 표시)
+    function listRule(sheetId, col, values) {
+      return {
+        setDataValidation: {
+          range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+          rule: { condition: { type: 'ONE_OF_LIST', values: values.map(v => ({ userEnteredValue: v })) }, showCustomUi: true, strict: false }
+        }
+      };
+    }
+
+    function ledgerValidationRequests() {
+      const names = kind => Array.from(new Set(ledgerOptionList(kind).map(o => o[0])));
+      const cats = Array.from(new Set(names('expense').concat(names('income'))));
+      const pays = names('payment');
+      const req = [
+        listRule(ledgerSheet.txSheetId, 2, ['지출', '수입']),
+        listRule(ledgerSheet.fixedSheetId, 2, ['지출', '수입']),
+        listRule(ledgerSheet.fixedSheetId, 8, ['매월', '매년']),
+        listRule(ledgerSheet.fixedSheetId, 12, ['Y', 'N'])
+      ];
+      if (cats.length) req.push(listRule(ledgerSheet.txSheetId, 4, cats), listRule(ledgerSheet.fixedSheetId, 4, cats));
+      if (pays.length) req.push(listRule(ledgerSheet.txSheetId, 5, pays), listRule(ledgerSheet.fixedSheetId, 5, pays));
+      if (ledgerSheet.settingsSheetId !== undefined && ledgerSheet.settingsSheetId !== null) {
+        req.push(listRule(ledgerSheet.settingsSheetId, 0, ['지출', '수입', '결제수단']), listRule(ledgerSheet.settingsSheetId, 4, ['Y', 'N']));
+      }
+      return req;
+    }
+
+    function hideColumns(sheetId, cols) {
+      return cols.map(([start, end]) => ({
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: start, endIndex: end },
+          properties: { hiddenByUser: true },
+          fields: 'hiddenByUser'
+        }
+      }));
+    }
+
+    function columnFormat(sheetId, col, numberFormat) {
+      return {
+        repeatCell: {
+          range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+          cell: { userEnteredFormat: { numberFormat } },
+          fields: 'userEnteredFormat.numberFormat'
+        }
+      };
+    }
+
+    // 기존 시트 보정: 설정 탭 생성, 앱 전용 칸 숨김, 날짜·금액 서식, 드롭다운 (한 번만)
+    async function ledgerEnsureStructure() {
+      if (ledgerSheet.structure === LEDGER_STRUCTURE_VERSION) return;
+      const meta = await sheetsApi(`/${encId(ledgerSheet.id)}?fields=sheets.properties`);
+      const find = t => (meta.sheets || []).find(sh => sh.properties.title === t);
+      if (!find(TX_SHEET) || !find(FIXED_SHEET)) throw new Error(`가계부 시트에 '${TX_SHEET}' 또는 '${FIXED_SHEET}' 탭이 없습니다. 탭 이름을 바꾸지 않았는지 확인해 주세요.`);
+      ledgerSheet.txSheetId = find(TX_SHEET).properties.sheetId;
+      ledgerSheet.fixedSheetId = find(FIXED_SHEET).properties.sheetId;
+
+      if (!find(SETTINGS_SHEET)) {
+        const added = await sheetsApi(`/${encId(ledgerSheet.id)}:batchUpdate`, {
+          method: 'POST',
+          body: { requests: [{ addSheet: { properties: { title: SETTINGS_SHEET, gridProperties: { frozenRowCount: 1 } } } }] }
+        });
+        ledgerSheet.settingsSheetId = added.replies[0].addSheet.properties.sheetId;
+        const rows = [SETTINGS_HEADERS].concat(defaultLedgerOptions().map(optionToRow));
+        await sheetsApi(`/${encId(ledgerSheet.id)}/values/${ledgerRange(SETTINGS_SHEET, `A1:E${rows.length}`)}?valueInputOption=RAW`, { method: 'PUT', body: { values: rows } });
+        await sheetsApi(`/${encId(ledgerSheet.id)}:batchUpdate`, {
+          method: 'POST',
+          body: { requests: [{ repeatCell: { range: { sheetId: ledgerSheet.settingsSheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.95, blue: 1 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } }] }
+        });
+      } else {
+        ledgerSheet.settingsSheetId = find(SETTINGS_SHEET).properties.sheetId;
+      }
+
+      const requests = []
+        .concat(hideColumns(ledgerSheet.txSheetId, [[0, 1], [7, 8], [10, 14]]))
+        .concat(hideColumns(ledgerSheet.fixedSheetId, [[0, 1], [7, 8], [14, 15]]))
+        .concat([
+          columnFormat(ledgerSheet.txSheetId, 1, { type: 'DATE', pattern: 'yyyy-mm-dd' }),
+          columnFormat(ledgerSheet.txSheetId, 3, { type: 'NUMBER', pattern: '#,##0' }),
+          columnFormat(ledgerSheet.fixedSheetId, 3, { type: 'NUMBER', pattern: '#,##0' })
+        ])
+        .concat(ledgerValidationRequests());
+      await sheetsApi(`/${encId(ledgerSheet.id)}:batchUpdate`, { method: 'POST', body: { requests } });
+
+      ledgerSheet.structure = LEDGER_STRUCTURE_VERSION;
+      try {
+        localStorage.setItem(LEDGER_KEYS.sheet, JSON.stringify(ledgerSheet));
+      } catch (e) {}
+    }
+
+    // 설정 탭 전체를 현재 목록으로 다시 저장 + 드롭다운 갱신
+    async function saveLedgerOptions() {
+      const rows = ledgerOptions
+        .slice()
+        .sort((a, b) => (a.kind === b.kind ? a.order - b.order : ['expense', 'income', 'payment'].indexOf(a.kind) - ['expense', 'income', 'payment'].indexOf(b.kind)))
+        .map(optionToRow);
+      await sheetsApi(`/${encId(ledgerSheet.id)}/values/${ledgerRange(SETTINGS_SHEET, 'A2:E')}:clear`, { method: 'POST', body: {} });
+      if (rows.length) {
+        await sheetsApi(`/${encId(ledgerSheet.id)}/values/${ledgerRange(SETTINGS_SHEET, `A2:E${rows.length + 1}`)}?valueInputOption=RAW`, { method: 'PUT', body: { values: rows } });
+      }
+      await sheetsApi(`/${encId(ledgerSheet.id)}:batchUpdate`, { method: 'POST', body: { requests: ledgerValidationRequests() } });
+    }
+
+    // 이름 변경 시 예전 기록(거래내역·고정비)의 분류/결제수단도 새 이름으로 일괄 변경
+    async function renameLedgerRecords(kind, oldName, newName) {
+      const col = kind === 'payment' ? 'F' : 'E';
+      const matchTx = t => (kind === 'payment' ? t.payment === oldName : (t.kind === kind && t.category === oldName));
+      const txIds = new Set(ledgerTx.filter(matchTx).map(t => t.id));
+      const fxIds = new Set(ledgerFixed.filter(matchTx).map(f => f.id));
+      if (!txIds.size && !fxIds.size) return 0;
+      const res = await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchGet?ranges=${ledgerRange(TX_SHEET, 'A:A')}&ranges=${ledgerRange(FIXED_SHEET, 'A:A')}`);
+      const [txCol, fxCol] = (res.valueRanges || []).map(v => v.values || []);
+      const data = [];
+      (txCol || []).forEach((r, i) => {
+        if (i > 0 && txIds.has(String(r[0]))) data.push({ range: `'${TX_SHEET}'!${col}${i + 1}`, values: [[newName]] });
+      });
+      (fxCol || []).forEach((r, i) => {
+        if (i > 0 && fxIds.has(String(r[0]))) data.push({ range: `'${FIXED_SHEET}'!${col}${i + 1}`, values: [[newName]] });
+      });
+      if (data.length) await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchUpdate`, { method: 'POST', body: { valueInputOption: 'RAW', data } });
+      return data.length;
+    }
+
+    function countOptionUsage(kind, name) {
+      const match = t => (kind === 'payment' ? t.payment === name : (t.kind === kind && t.category === name));
+      return ledgerTx.filter(match).length + ledgerFixed.filter(match).length;
+    }
+
+    /* ----- 편집 창 ----- */
+    const ledgerOptionsModalEl = document.getElementById('ledger-options-modal');
+    const ledgerOptionsContent = document.getElementById('ledger-options-content');
+    let optionsKind = 'expense';
+
+    document.getElementById('opt-emoji-grid').innerHTML = OPTION_EMOJIS.map(e => `<button type="button" class="opt-emoji p-1 rounded-lg hover:bg-brand-100">${e}</button>`).join('');
+
+    function openOptionsEditor() {
+      resetOptionForm();
+      renderOptionsEditor();
+      showSheetModal(ledgerOptionsModalEl, ledgerOptionsContent);
+    }
+
+    function closeOptionsEditor() {
+      hideSheetModal(ledgerOptionsModalEl, ledgerOptionsContent);
+    }
+
+    function resetOptionForm() {
+      document.getElementById('opt-edit-name').value = '';
+      document.getElementById('opt-name').value = '';
+      document.getElementById('opt-icon').value = optionsKind === 'payment' ? '💳' : '📦';
+      document.getElementById('opt-form-title').innerText = '+ 새 항목 추가';
+      document.getElementById('opt-save').innerText = '추가';
+      document.getElementById('opt-form-reset').classList.add('hidden');
+    }
+
+    function renderOptionsEditor() {
+      document.querySelectorAll('.opt-kind-btn').forEach(btn => {
+        btn.className = `opt-kind-btn py-1.5 rounded-lg ${btn.dataset.optKind === optionsKind ? 'bg-white text-brand-600 shadow-xs' : 'text-slate-500'}`;
+      });
+      const items = ledgerOptions.filter(o => o.kind === optionsKind).sort((a, b) => a.order - b.order);
+      const list = document.getElementById('opt-list');
+      if (items.length === 0) {
+        list.innerHTML = '<div class="text-[11px] text-slate-400 text-center py-4">항목이 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = items.map((o, i) => `
+        <div class="flex items-center gap-1.5 p-1.5 rounded-xl border ${o.active ? 'border-slate-200 bg-white' : 'border-dashed border-slate-200 bg-slate-50 opacity-60'}" data-opt-name="${escapeHtml(o.name)}">
+          <span class="w-8 h-8 shrink-0 rounded-lg bg-slate-100 flex items-center justify-center text-base">${escapeHtml(o.icon)}</span>
+          <span class="flex-1 min-w-0 text-xs font-bold text-slate-700 truncate">${escapeHtml(o.name)}${o.active ? '' : ' <span class="text-[9px] font-semibold text-slate-400">숨김</span>'}</span>
+          <button type="button" data-opt-act="up" class="w-7 h-7 rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-20" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+          <button type="button" data-opt-act="down" class="w-7 h-7 rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-20" ${i === items.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+          <button type="button" data-opt-act="toggle" class="px-2 h-7 rounded-lg text-[10px] font-bold ${o.active ? 'text-slate-500 hover:bg-slate-100' : 'text-brand-600 hover:bg-brand-50'}">${o.active ? '숨기기' : '보이기'}</button>
+          <button type="button" data-opt-act="edit" class="px-2 h-7 rounded-lg text-[10px] font-bold text-brand-600 hover:bg-brand-50">수정</button>
+        </div>`).join('');
+    }
+
+    async function persistOptions(successMessage) {
+      if (ledgerBusy) return false;
+      if (!ledgerHasAuth()) {
+        showToast('구글 연결이 필요합니다. 상단 "다시 연결"을 눌러 주세요.', 'danger');
+        return false;
+      }
+      const saving = document.getElementById('opt-saving');
+      saving.classList.remove('hidden');
+      let ok = false;
+      await ledgerRun(async () => {
+        await saveLedgerOptions();
+        try {
+          localStorage.setItem(LEDGER_KEYS.cache, JSON.stringify({ sheetId: ledgerSheet.id, tx: ledgerTx, fixed: ledgerFixed, options: ledgerOptions, at: new Date().toISOString() }));
+        } catch (e) {}
+        ok = true;
+        if (successMessage) showToast(successMessage);
+      });
+      saving.classList.add('hidden');
+      renderOptionsEditor();
+      renderAll();
+      return ok;
+    }
+
+    document.querySelectorAll('.opt-kind-btn').forEach(btn => btn.addEventListener('click', () => {
+      optionsKind = btn.dataset.optKind;
+      resetOptionForm();
+      renderOptionsEditor();
+    }));
+
+    document.getElementById('opt-emoji-grid').addEventListener('click', (e) => {
+      const btn = e.target.closest('.opt-emoji');
+      if (!btn) return;
+      const input = document.getElementById('opt-icon');
+      input.value = btn.innerText.trim();
+      input.classList.add('ring-4', 'ring-brand-200');
+      setTimeout(() => input.classList.remove('ring-4', 'ring-brand-200'), 200);
+    });
+
+    document.getElementById('opt-form-reset').addEventListener('click', resetOptionForm);
+    document.getElementById('ledger-options-close-btn').addEventListener('click', closeOptionsEditor);
+
+    document.getElementById('opt-list').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-opt-act]');
+      if (!btn || ledgerBusy) return;
+      const name = btn.closest('[data-opt-name]').dataset.optName;
+      const items = ledgerOptions.filter(o => o.kind === optionsKind).sort((a, b) => a.order - b.order);
+      const idx = items.findIndex(o => o.name === name);
+      const item = items[idx];
+      if (!item) return;
+      const act = btn.dataset.optAct;
+      if (act === 'edit') {
+        document.getElementById('opt-edit-name').value = item.name;
+        document.getElementById('opt-name').value = item.name;
+        document.getElementById('opt-icon').value = item.icon;
+        document.getElementById('opt-form-title').innerText = `✏️ '${item.name}' 수정`;
+        document.getElementById('opt-save').innerText = '저장';
+        document.getElementById('opt-form-reset').classList.remove('hidden');
+        document.getElementById('opt-name').focus();
+        return;
+      }
+      if (act === 'toggle') {
+        if (item.active && items.filter(o => o.active).length === 1) {
+          showToast('최소 한 개는 사용 중이어야 합니다.', 'danger');
+          return;
+        }
+        item.active = !item.active;
+        await persistOptions(item.active ? `'${item.name}'을(를) 다시 표시합니다.` : `'${item.name}'을(를) 숨겼습니다. 예전 기록은 그대로입니다.`);
+        return;
+      }
+      const swapWith = act === 'up' ? items[idx - 1] : items[idx + 1];
+      if (!swapWith) return;
+      items.forEach((o, i) => { o.order = i + 1; });
+      [item.order, swapWith.order] = [swapWith.order, item.order];
+      await persistOptions();
+    });
+
+    document.getElementById('opt-save').addEventListener('click', async () => {
+      if (ledgerBusy) return;
+      const name = document.getElementById('opt-name').value.trim();
+      const icon = document.getElementById('opt-icon').value.trim() || '📦';
+      const editName = document.getElementById('opt-edit-name').value;
+      if (!name) return showToast('이름을 입력해 주세요.', 'danger');
+      const sameKind = ledgerOptions.filter(o => o.kind === optionsKind);
+      if (sameKind.some(o => o.name === name && o.name !== editName)) return showToast(`'${name}'은(는) 이미 있습니다.`, 'danger');
+
+      if (!editName) {
+        const maxOrder = sameKind.reduce((m, o) => Math.max(m, o.order), 0);
+        ledgerOptions.push({ kind: optionsKind, name, icon, order: maxOrder + 1, active: true });
+        if (await persistOptions(`'${name}'을(를) 추가했습니다.`)) resetOptionForm();
+        return;
+      }
+
+      const item = sameKind.find(o => o.name === editName);
+      if (!item) return;
+      const renamed = editName !== name;
+      item.name = name;
+      item.icon = icon;
+      if (!(await persistOptions(renamed ? null : `'${name}'을(를) 수정했습니다.`))) return;
+      resetOptionForm();
+      if (!renamed) return;
+
+      // B안: 예전 기록도 새 이름으로 바꿀지 묻기
+      const used = countOptionUsage(optionsKind, editName);
+      if (used === 0) {
+        showToast(`'${editName}' → '${name}'(으)로 이름을 바꿨습니다.`);
+        return;
+      }
+      confirmAction(
+        '예전 기록도 바꿀까요?',
+        `'${editName}'(으)로 기록된 내역이 ${used}건 있습니다.\n함께 '${name}'(으)로 바꾸면 통계에서 하나로 합쳐집니다.\n바꾸지 않으면 예전 기록은 '${editName}'(으)로 남습니다.`,
+        () => {
+          ledgerRun(async () => {
+            const changed = await renameLedgerRecords(optionsKind, editName, name);
+            await ledgerSync();
+            showToast(`예전 기록 ${changed}건을 '${name}'(으)로 바꿨습니다.`);
+          });
+        },
+        {
+          okLabel: '함께 바꾸기',
+          cancelLabel: '이름만 바꾸기',
+          okClass: 'bg-brand-600 hover:bg-brand-700',
+          onCancel: () => showToast(`이름만 바꿨습니다. 예전 기록은 '${editName}'(으)로 남습니다.`)
+        }
+      );
     });
 
     applyLedgerClass();
