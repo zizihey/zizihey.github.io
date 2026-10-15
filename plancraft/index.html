@@ -1670,7 +1670,7 @@
       setTimeout(() => {
         toast.classList.add('opacity-0', '-translate-y-1');
         setTimeout(() => toast.remove(), 250);
-      }, 2000);
+      }, type === 'danger' ? 5000 : 2500);
     }
 
     function getFilteredEvents(options = {}) {
@@ -4108,8 +4108,18 @@
     }
 
     /* ----- 불러오기 ----- */
-    async function ledgerSync() {
-      if (!ledgerEnabled() || ledgerSyncing) return;
+    // 동기화 중에 또 요청되면(예: 저장 직후) 건너뛰지 않고, 진행 중인 것이 끝난 뒤 최신 내용으로 다시 불러옴
+    let ledgerSyncPromise = null;
+    function ledgerSync() {
+      if (ledgerSyncPromise) return ledgerSyncPromise.then(() => ledgerSync());
+      ledgerSyncPromise = ledgerSyncOnce().finally(() => {
+        ledgerSyncPromise = null;
+      });
+      return ledgerSyncPromise;
+    }
+
+    async function ledgerSyncOnce() {
+      if (!ledgerEnabled()) return;
       if (!ledgerHasAuth()) {
         ledgerError = gcalConnected() ? 'scope' : 'auth';
         if (currentView === 'ledger') renderLedgerView();
@@ -4204,8 +4214,12 @@
     async function ledgerRun(task) {
       if (ledgerBusy) return;
       if (!ledgerHasAuth()) {
-        showToast('가계부를 쓰려면 구글 연결이 필요합니다. 상단 "다시 연결"을 눌러 주세요.', 'danger');
-        return;
+        // 연결이 만료됐거나 스프레드시트 권한이 빠진 경우: 저장 버튼을 누른 김에 바로 다시 연결 시도
+        const ok = await gcalConnect([SHEETS_SCOPE]);
+        if (!ok || !ledgerHasAuth()) {
+          showToast('저장하지 못했습니다. 구글 연결(스프레드시트 권한 포함)이 필요합니다. ⋯ 메뉴 또는 상단의 "다시 연결"을 눌러 주세요.', 'danger');
+          return;
+        }
       }
       ledgerBusy = true;
       try {
@@ -4677,6 +4691,8 @@
         if (existing) await ledgerUpdateRow(TX_SHEET, 'N', tx.id, txToRow(tx));
         else await ledgerAppend(TX_SHEET, 'N', txToRow(tx));
         closeLedgerModal();
+        ledgerTx = existing ? ledgerTx.map(t => (t.id === tx.id ? tx : t)) : ledgerTx.concat([tx]);
+        renderAll();
         await ledgerSync();
         let hint = '';
         if (!ledgerOwnerMatches(tx)) hint = ` (지금 '${ledgerOwnerName(currentFamilyFilter)}' 탭이라 목록에는 안 보입니다. '전체'에서 확인하세요)`;
