@@ -962,6 +962,19 @@
     </div>
   </div>
 
+  <!-- Emoji Picker Popover (담당자 아이콘 고르기) -->
+  <div id="emoji-popover" class="hidden fixed z-[70] w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2.5 flex-col gap-2">
+    <div class="flex items-center justify-between">
+      <span class="text-[11px] font-bold text-slate-600">아이콘 고르기</span>
+      <button type="button" id="emoji-popover-close" class="p-1 text-slate-400 hover:text-slate-600 rounded-lg text-xs">✕</button>
+    </div>
+    <div id="emoji-popover-grid" class="grid grid-cols-8 gap-0.5 text-lg text-center max-h-44 overflow-y-auto"></div>
+    <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+      <input type="text" id="emoji-popover-input" placeholder="직접 입력 (키보드 이모지)" class="flex-1 min-w-0 px-2 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none select-text">
+      <button type="button" id="emoji-popover-apply" class="shrink-0 px-2.5 py-1.5 text-[11px] font-bold text-white bg-brand-600 rounded-lg">적용</button>
+    </div>
+  </div>
+
   <!-- Trash Bin Modal (휴지통 모달) -->
   <div id="trash-modal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs hidden opacity-0 transition-opacity duration-200">
     <div id="trash-modal-content" class="bg-white rounded-t-3xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden transform translate-y-6 sm:translate-y-0 sm:scale-95 transition-all duration-200 flex flex-col max-h-[85vh]">
@@ -3681,6 +3694,7 @@
     }
 
     function closeGcalModal() {
+      if (typeof closeEmojiPopover === 'function') closeEmojiPopover();
       gcalModalEl.classList.add('opacity-0');
       gcalModalContent.classList.add('translate-y-6', 'sm:scale-95');
       setTimeout(() => gcalModalEl.classList.add('hidden'), 180);
@@ -3751,7 +3765,8 @@
             <span class="ml-auto shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${writable ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${writable ? '편집 가능' : '보기 전용'}</span>
           </label>
           <div class="grid gap-1.5" style="grid-template-columns: 44px 1fr 96px;">
-            <input type="text" class="gcal-icon-input text-center text-base bg-slate-50 border border-slate-200 rounded-lg select-text" maxlength="2" value="${escapeHtml(icon)}" title="아이콘">
+            <button type="button" class="gcal-icon-btn flex items-center justify-center gap-0.5 text-base bg-slate-50 border border-slate-200 rounded-lg hover:border-brand-400" title="아이콘 고르기"><span class="gcal-icon-preview">${escapeHtml(icon)}</span><span class="text-[8px] text-slate-400">▾</span></button>
+            <input type="hidden" class="gcal-icon-input" value="${escapeHtml(icon)}">
             <input type="text" class="gcal-name-input px-2 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg select-text" value="${escapeHtml(name)}" placeholder="담당자 이름">
             <select class="gcal-color-input px-1 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg">
               ${Object.keys(COLOR_THEMES).map(c => `<option value="${c}" ${c === color ? 'selected' : ''}>${COLOR_LABELS[c]}</option>`).join('')}
@@ -3773,6 +3788,69 @@
     }
 
     document.getElementById('gcal-modal-close-btn').addEventListener('click', closeGcalModal);
+
+    /* ----- 담당자 아이콘 고르기 팝업 ----- */
+    const MEMBER_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '👶', '🧒', '👴', '👵', '🧓', '👨‍🦱', '👩‍🦰', '👱', '🧔', '👸',
+      '👨‍👩‍👧‍👦', '👨‍👩‍👧', '👨‍👩‍👦', '👪', '❤️', '🧡', '💛', '💚', '💙', '💜', '🤍', '⭐', '🌟', '🌸', '🌻', '🍀',
+      '🐶', '🐱', '🐰', '🐻', '🐼', '🐨', '🐥', '🦊', '🐯', '🦁', '🐸', '🐹', '🎒', '📚', '⚽', '🏀',
+      '🎹', '🎨', '🎮', '💼', '💻', '🏠', '🏡', '🚗', '✈️', '🎂', '😊', '😎', '🥰', '🤩', '😇', '🦄'];
+    const emojiPopover = document.getElementById('emoji-popover');
+    let emojiTargetRow = null;
+    document.getElementById('emoji-popover-grid').innerHTML = MEMBER_EMOJIS.map(e => `<button type="button" class="emoji-pick p-1 rounded-lg hover:bg-brand-100">${e}</button>`).join('');
+
+    function setRowIcon(row, icon) {
+      row.querySelector('.gcal-icon-input').value = icon;
+      row.querySelector('.gcal-icon-preview').innerText = icon;
+    }
+
+    function closeEmojiPopover() {
+      emojiPopover.classList.add('hidden');
+      emojiPopover.classList.remove('flex');
+      emojiTargetRow = null;
+    }
+
+    function openEmojiPopover(btn) {
+      emojiTargetRow = btn.closest('.gcal-row');
+      document.getElementById('emoji-popover-input').value = '';
+      emojiPopover.classList.remove('hidden');
+      emojiPopover.classList.add('flex');
+      // 버튼 아래(공간이 없으면 위)에, 화면 밖으로 나가지 않게 배치
+      const rect = btn.getBoundingClientRect();
+      const pw = emojiPopover.offsetWidth;
+      const ph = emojiPopover.offsetHeight;
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - pw - 8));
+      const top = rect.bottom + ph + 8 < window.innerHeight ? rect.bottom + 4 : Math.max(8, rect.top - ph - 4);
+      emojiPopover.style.left = `${left}px`;
+      emojiPopover.style.top = `${top}px`;
+    }
+
+    document.getElementById('gcal-cal-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('.gcal-icon-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      if (!emojiPopover.classList.contains('hidden') && emojiTargetRow === btn.closest('.gcal-row')) closeEmojiPopover();
+      else openEmojiPopover(btn);
+    });
+    document.getElementById('emoji-popover-grid').addEventListener('click', (e) => {
+      const pick = e.target.closest('.emoji-pick');
+      if (!pick || !emojiTargetRow) return;
+      setRowIcon(emojiTargetRow, pick.innerText.trim());
+      closeEmojiPopover();
+    });
+    document.getElementById('emoji-popover-apply').addEventListener('click', () => {
+      const value = document.getElementById('emoji-popover-input').value.trim();
+      if (!value || !emojiTargetRow) return;
+      setRowIcon(emojiTargetRow, Array.from(value).slice(0, 8).join(''));
+      closeEmojiPopover();
+    });
+    document.getElementById('emoji-popover-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('emoji-popover-apply').click();
+    });
+    document.getElementById('emoji-popover-close').addEventListener('click', closeEmojiPopover);
+    document.addEventListener('click', (e) => {
+      if (!emojiPopover.classList.contains('hidden') && !e.target.closest('#emoji-popover') && !e.target.closest('.gcal-icon-btn')) closeEmojiPopover();
+    });
+    document.getElementById('gcal-cal-list').closest('.overflow-y-auto').addEventListener('scroll', closeEmojiPopover);
     document.getElementById('gcal-open-ledger-settings').addEventListener('click', () => {
       if (!isGoogleMode()) {
         showToast('먼저 구글 캘린더 연동을 설정하고 "저장하고 사용하기"를 눌러 주세요.', 'danger');
