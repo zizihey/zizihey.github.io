@@ -1813,11 +1813,14 @@
         }
 
         if (ledgerShowOnCalendar()) {
+          // 하루 수입(초록 +)과 지출(빨강 -)을 함께 표시
+          const dayIncome = ledgerDayIncome(dayStr);
           const dayExpense = ledgerDayExpense(dayStr);
-          if (dayExpense > 0) {
+          if (dayIncome > 0 || dayExpense > 0) {
             const money = document.createElement('div');
-            money.className = `${isMobileView ? 'text-[10px] px-0.5' : 'text-[9px]'} font-bold text-rose-500 leading-none truncate mt-0.5`;
-            money.innerText = `-${formatMoneyShort(dayExpense)}`;
+            money.className = `${isMobileView ? 'text-[10px] px-0.5' : 'text-[9px]'} font-bold leading-tight mt-0.5 flex flex-wrap gap-x-1`;
+            money.innerHTML = (dayIncome > 0 ? `<span class="text-emerald-600">+${formatMoneyShort(dayIncome)}</span>` : '') +
+              (dayExpense > 0 ? `<span class="text-rose-500">-${formatMoneyShort(dayExpense)}</span>` : '');
             cell.appendChild(money);
           }
         }
@@ -4312,6 +4315,10 @@
       return ledgerTx.filter(t => t.date.startsWith(monthKey) && ledgerOwnerMatches(t));
     }
 
+    function ledgerDayIncome(dateStr) {
+      return ledgerTx.filter(t => t.date === dateStr && t.kind === 'income' && ledgerOwnerMatches(t)).reduce((sum, t) => sum + t.amount, 0);
+    }
+
     function ledgerDayExpense(dateStr) {
       return ledgerTx.filter(t => t.date === dateStr && t.kind === 'expense' && ledgerOwnerMatches(t)).reduce((sum, t) => sum + t.amount, 0);
     }
@@ -4936,7 +4943,7 @@
           <span class="text-brand-600 text-xs font-bold">편집 ›</span>
         </button>
         <label class="flex items-center justify-between gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer">
-          <span class="text-xs font-semibold text-slate-700">월간 달력에 하루 지출 합계 표시</span>
+          <span class="text-xs font-semibold text-slate-700">월간 달력에 하루 수입·지출 합계 표시</span>
           <input type="checkbox" data-ls="oncal" class="w-4 h-4 rounded text-brand-600" ${ledgerShowOnCalendar() ? 'checked' : ''}>
         </label>
         <button type="button" data-ls="unlink" class="self-start text-[11px] text-slate-400 hover:text-rose-500 font-semibold">이 기기에서 가계부 연결 해제 (시트는 지워지지 않음)</button>`;
