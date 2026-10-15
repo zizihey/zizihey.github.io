@@ -4319,6 +4319,14 @@
 
       const tabBtn = (key, label) => `<button type="button" data-ledger-tab="${key}" class="px-3 py-1.5 rounded-lg text-xs ${ledgerTab === key ? 'bg-white text-brand-600 font-bold shadow-xs' : 'text-slate-500 font-semibold'}">${label}</button>`;
 
+      if (currentFamilyFilter !== 'all') {
+        const fam = getFamilyInfo(currentFamilyFilter);
+        notice += `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl border text-[11px] font-semibold" style="${fam.style}">
+          <span>${escapeHtml(fam.icon)} '${escapeHtml(fam.name)}' 담당 기록만 집계 중입니다</span>
+          <button type="button" data-action="show-all" class="shrink-0 px-2 py-1 rounded-lg bg-white/80 font-bold">전체 보기</button>
+        </div>`;
+      }
+
       let html = `<div class="ledger-scroll overflow-y-auto max-h-[70vh] md:max-h-[640px] p-3 flex flex-col gap-3">
         ${notice}
         <div class="grid grid-cols-3 gap-2">
@@ -4509,6 +4517,7 @@
       if (fixed) return openFixedModal(fixed.dataset.fixedId);
       const action = e.target.closest('[data-action]');
       if (!action) return;
+      if (action.dataset.action === 'show-all') return setFamilyTab('all');
       if (action.dataset.action === 'add-tx') openLedgerModal({ date: ledgerDefaultDate() });
       else if (action.dataset.action === 'add-fixed') openFixedModal(null);
       else if (action.dataset.action === 'settings') openLedgerSettings();
@@ -4530,7 +4539,7 @@
       const box = document.createElement('div');
       box.className = 'mt-1 p-2 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col';
       box.innerHTML = `<div class="flex items-center justify-between px-1 pb-1">
-          <span class="text-[11px] font-bold text-emerald-800">💰 가계부${list.length ? ` · ${net >= 0 ? '+' : '-'}${formatMoney(Math.abs(net))}` : ''}</span>
+          <span class="text-[11px] font-bold text-emerald-800">💰 가계부${currentFamilyFilter !== 'all' ? ` (${escapeHtml(ledgerOwnerName(currentFamilyFilter))})` : ''}${list.length ? ` · ${net >= 0 ? '+' : '-'}${formatMoney(Math.abs(net))}` : ''}</span>
           <button type="button" class="sidebar-ledger-add text-[11px] font-bold text-emerald-700 hover:underline">+ 기록</button>
         </div>
         ${list.length ? list.map(t => txRowHtml(t)).join('') : '<div class="text-[10px] text-slate-400 px-1 pb-1">이날 기록이 없습니다.</div>'}`;
@@ -4669,7 +4678,10 @@
         else await ledgerAppend(TX_SHEET, 'N', txToRow(tx));
         closeLedgerModal();
         await ledgerSync();
-        showToast(existing ? '가계부를 수정했습니다.' : `${tx.kind === 'income' ? '수입' : '지출'} ${formatMoney(amount)}원을 기록했습니다.`);
+        let hint = '';
+        if (!ledgerOwnerMatches(tx)) hint = ` (지금 '${ledgerOwnerName(currentFamilyFilter)}' 탭이라 목록에는 안 보입니다. '전체'에서 확인하세요)`;
+        else if (currentView === 'ledger' && !tx.date.startsWith(ledgerMonthKey())) hint = ` (${Number(tx.date.slice(5, 7))}월 가계부에 집계됩니다)`;
+        showToast((existing ? '가계부를 수정했습니다.' : `${tx.kind === 'income' ? '수입' : '지출'} ${formatMoney(amount)}원을 기록했습니다.`) + hint);
       });
     });
 
