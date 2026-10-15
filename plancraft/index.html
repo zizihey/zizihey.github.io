@@ -4128,10 +4128,33 @@
       ledgerSyncing = true;
       try {
         await ledgerEnsureStructure();
-        const res = await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchGet?ranges=${ledgerRange(TX_SHEET, 'A2:N')}&ranges=${ledgerRange(FIXED_SHEET, 'A2:O')}&ranges=${ledgerRange(SETTINGS_SHEET, 'A2:E')}&valueRenderOption=UNFORMATTED_VALUE`);
+        const res = await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchGet?ranges=${ledgerRange(TX_SHEET, 'A2:O')}&ranges=${ledgerRange(FIXED_SHEET, 'A2:P')}&ranges=${ledgerRange(SETTINGS_SHEET, 'A2:E')}&valueRenderOption=UNFORMATTED_VALUE`);
         const ranges = (res && res.valueRanges) || [];
         const txRows = (ranges[0] && ranges[0].values) || [];
         const fixedRows = (ranges[1] && ranges[1].values) || [];
+
+        // 예전 방식으로 한 칸 오른쪽에 밀려 기록된 행을 제자리(A열부터)로 복구
+        const shiftRepairs = [];
+        const repairShifted = (rows, sheetName, prefix, width, lastCol, clearCol) => {
+          rows.forEach((r, i) => {
+            if (!r[0] && new RegExp(`^${prefix}_`).test(String(r[1] || ''))) {
+              const fixedRow = r.slice(1, width + 1);
+              while (fixedRow.length < width) fixedRow.push('');
+              shiftRepairs.push({ range: `'${sheetName}'!A${i + 2}:${clearCol}${i + 2}`, values: [fixedRow.concat([''])] });
+              rows[i] = fixedRow;
+            }
+          });
+        };
+        repairShifted(txRows, TX_SHEET, 'tx', TX_HEADERS.length, 'N', 'O');
+        repairShifted(fixedRows, FIXED_SHEET, 'fx', FIXED_HEADERS.length, 'O', 'P');
+        if (shiftRepairs.length) {
+          try {
+            await sheetsApi(`/${encId(ledgerSheet.id)}/values:batchUpdate`, { method: 'POST', body: { valueInputOption: 'RAW', data: shiftRepairs } });
+            showToast(`밀려서 저장된 가계부 기록 ${shiftRepairs.length}건을 제자리로 복구했습니다.`);
+          } catch (e) {
+            console.warn('Failed to repair shifted ledger rows:', e);
+          }
+        }
 
         // 시트에 직접 입력해 ID가 비어 있는 행: 자동으로 ID를 붙여 시트에 기록
         const idUpdates = [];
@@ -4188,10 +4211,19 @@
       return idx + 1; // 시트 행 번호(1부터)
     }
 
+    function toSheetCell(v) {
+      if (v === '' || v === null || v === undefined) return {};
+      if (typeof v === 'number') return { userEnteredValue: { numberValue: v } };
+      return { userEnteredValue: { stringValue: String(v) } };
+    }
+
+    // values.append는 구글이 표의 시작 열을 추측해서 한 칸 밀려 들어가는 경우가 있어(숨긴 A열 등),
+    // 마지막 데이터 행 아래에 항상 A열부터 붙이는 appendCells를 사용
     async function ledgerAppend(sheetName, lastCol, row) {
-      await sheetsApi(`/${encId(ledgerSheet.id)}/values/${ledgerRange(sheetName, `A:${lastCol}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      const sheetId = sheetName === TX_SHEET ? ledgerSheet.txSheetId : sheetName === FIXED_SHEET ? ledgerSheet.fixedSheetId : ledgerSheet.settingsSheetId;
+      await sheetsApi(`/${encId(ledgerSheet.id)}:batchUpdate`, {
         method: 'POST',
-        body: { values: [row] }
+        body: { requests: [{ appendCells: { sheetId, rows: [{ values: row.map(toSheetCell) }], fields: 'userEnteredValue' } }] }
       });
     }
 
