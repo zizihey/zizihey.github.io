@@ -2435,17 +2435,12 @@
       const end = endDateInput.value;
       const multi = start && end && end > start;
       if (multi) {
-        multiDayNotice.innerText = `📆 ${daysBetween(start, end) + 1}일 기간 일정 · 기간 일정은 반복을 사용할 수 없습니다`;
+        multiDayNotice.innerText = `📆 ${daysBetween(start, end) + 1}일 기간 일정`;
         multiDayNotice.classList.remove('hidden');
-        if (repeatTypeSelect.value !== 'none') {
-          repeatTypeSelect.value = 'none';
-          repeatUntilBox.classList.add('hidden');
-        }
-        repeatTypeSelect.disabled = true;
       } else {
         multiDayNotice.classList.add('hidden');
-        repeatTypeSelect.disabled = repeatLockedByEdit;
       }
+      repeatTypeSelect.disabled = repeatLockedByEdit;
     }
 
     // 시작일을 바꾸면 기간 길이를 유지한 채 종료일도 함께 이동
@@ -2633,7 +2628,7 @@
       // 반복 일정의 개별 회차는 하루짜리로 유지
       endDateInput.disabled = Boolean(ev.repeatGroupId);
       prevStartDate = ev.date;
-      repeatLockedByEdit = true;
+      repeatLockedByEdit = Boolean(ev.repeatGroupId);
       isAllDayCheckbox.checked = Boolean(ev.isAllDay);
       updateTimeInputStates(Boolean(ev.isAllDay));
       const sTime = ev.startTime || '09:00';
@@ -2653,10 +2648,16 @@
         repeatUntilBox.classList.remove('hidden');
         repeatUntilInput.value = ev.repeatUntil || ev.date;
         repeatUntilInput.disabled = true;
+        repeatEditNotice.innerText = isGoogleMode() ? '이 날짜만 수정됩니다 · 반복 규칙은 구글 캘린더에서 변경' : '반복 일정은 개별 일자별로 수정됩니다';
         repeatEditNotice.classList.remove('hidden');
       } else {
+        // 반복이 아닌 일정: 여기서 반복 일정으로 바꿀 수 있음
         repeatTypeSelect.value = 'none';
-        repeatTypeSelect.disabled = true;
+        repeatTypeSelect.disabled = false;
+        repeatUntilInput.disabled = false;
+        const until = parseDateYMD(ev.date);
+        until.setMonth(until.getMonth() + 3);
+        repeatUntilInput.value = formatDateYMD(until);
         repeatUntilBox.classList.add('hidden');
         repeatEditNotice.classList.add('hidden');
       }
@@ -2735,10 +2736,10 @@
         const fields = {
           title, date, endDate, isAllDay, startTime, endTime, category, priority, familyMember, memo,
           completed: existing ? existing.completed : false,
-          repeatType: existing ? 'none' : (isMulti ? 'none' : repeatType),
+          repeatType: existing && existing.repeatGroupId ? 'none' : repeatType,
           repeatUntil
         };
-        if (!existing && fields.repeatType !== 'none' && repeatUntil && repeatUntil < date) {
+        if (fields.repeatType !== 'none' && repeatUntil && repeatUntil < date) {
           showToast('반복 종료일은 시작일보다 이후여야 합니다.', 'danger');
           return;
         }
@@ -2747,12 +2748,17 @@
           selectedDateStr = date;
           closeModal();
           await gcalSync({ force: true });
-          showToast(existing ? '일정이 수정되었습니다.' : '구글 캘린더에 일정이 등록되었습니다.');
+          showToast(existing
+            ? (fields.repeatType !== 'none' ? '반복 일정으로 바꿨습니다.' : '일정이 수정되었습니다.')
+            : '구글 캘린더에 일정이 등록되었습니다.');
         });
         return;
       }
 
-      if (id) {
+      const existingLocal = id ? events.find(ev => ev.id === id) : null;
+      const convertToSeries = Boolean(existingLocal && !existingLocal.repeatGroupId && repeatType !== 'none' && repeatUntil);
+
+      if (id && !convertToSeries) {
         const index = events.findIndex(ev => ev.id === id);
         if (index !== -1) {
           events[index] = {
@@ -2771,7 +2777,7 @@
           showToast('일정이 수정되었습니다.');
         }
       } else {
-        if (repeatType !== 'none' && repeatUntil && !isMulti) {
+        if (repeatType !== 'none' && repeatUntil) {
           // Generate recurring series
           const startDt = parseDateYMD(date);
           const endDt = parseDateYMD(repeatUntil);
@@ -2782,6 +2788,7 @@
           }
 
           const repeatGroupId = 'rep_' + Date.now();
+          const spanDays = daysBetween(date, endDate); // 기간 일정이면 회차마다 같은 길이 유지
           const series = [];
           let curCursor = new Date(startDt);
           let count = 0;
@@ -2809,7 +2816,7 @@
               repeatUntil,
               title,
               date: occurrenceDate,
-              endDate: occurrenceDate,
+              endDate: addDaysStr(occurrenceDate, spanDays),
               isAllDay,
               startTime,
               endTime,
@@ -2825,6 +2832,7 @@
             curCursor = nthOccurrence(count);
           }
 
+          if (convertToSeries) events = events.filter(ev => ev.id !== existingLocal.id);
           events.push(...series);
           showToast(`${count}개의 반복 일정이 등록되었습니다.`);
         } else {
@@ -3410,7 +3418,7 @@
           body.end.date = null;
         }
       }
-      if (!forPatch && f.repeatType && ['daily', 'weekly', 'monthly', 'yearly'].includes(f.repeatType) && f.repeatUntil) {
+      if (f.repeatType && ['daily', 'weekly', 'monthly', 'yearly'].includes(f.repeatType) && f.repeatUntil) {
         let rule = `RRULE:FREQ=${f.repeatType.toUpperCase()}`;
         const d = parseDateYMD(f.date);
         const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
