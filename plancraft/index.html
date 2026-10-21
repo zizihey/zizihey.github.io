@@ -494,6 +494,19 @@
               <input type="date" id="form-repeat-until" class="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-brand-500 outline-none" title="반복 종료일">
             </div>
           </div>
+          <!-- 반복 일정 수정 범위 -->
+          <div id="repeat-scope-box" class="hidden flex-col gap-1.5 pt-2 border-t border-slate-200">
+            <span class="text-[11px] font-bold text-slate-700">수정 범위</span>
+            <div class="grid grid-cols-2 gap-1.5">
+              <label class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 bg-white cursor-pointer text-xs font-semibold text-slate-700 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
+                <input type="radio" name="repeat-scope" value="this" checked class="text-brand-600"> 이번 일정만
+              </label>
+              <label class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 bg-white cursor-pointer text-xs font-semibold text-slate-700 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
+                <input type="radio" name="repeat-scope" value="following" class="text-brand-600"> 이후 일정 모두
+              </label>
+            </div>
+            <p id="repeat-scope-hint" class="text-[10px] text-slate-400 leading-snug">이 날짜의 일정만 바뀝니다.</p>
+          </div>
         </div>
 
         <!-- Category & Priority -->
@@ -2429,6 +2442,26 @@
     let prevStartDate = '';
     let repeatLockedByEdit = false;
 
+    const repeatScopeBox = document.getElementById('repeat-scope-box');
+
+    function getRepeatScope() {
+      const checked = document.querySelector('input[name="repeat-scope"]:checked');
+      return checked ? checked.value : 'this';
+    }
+
+    function setRepeatScope(value) {
+      document.querySelectorAll('input[name="repeat-scope"]').forEach(r => { r.checked = r.value === value; });
+      updateRepeatScopeHint();
+    }
+
+    function updateRepeatScopeHint() {
+      document.getElementById('repeat-scope-hint').innerText = getRepeatScope() === 'following'
+        ? '이 날짜부터 이후 반복 일정의 제목·시간·담당자 등이 함께 바뀝니다. 이전 일정은 그대로입니다.'
+        : '이 날짜의 일정만 바뀝니다.';
+    }
+
+    document.querySelectorAll('input[name="repeat-scope"]').forEach(r => r.addEventListener('change', updateRepeatScopeHint));
+
     // 기간 일정이면 반복 설정을 끄고 안내 문구 표시
     function updateMultiDayState() {
       const start = startDateInput.value;
@@ -2595,6 +2628,8 @@
       repeatUntilInput.disabled = false;
       repeatUntilBox.classList.add('hidden');
       repeatEditNotice.classList.add('hidden');
+      repeatScopeBox.classList.add('hidden');
+      repeatScopeBox.classList.remove('flex');
       updateMultiDayState();
       
       const defaultUntil = parseDateYMD(targetDate);
@@ -2626,7 +2661,7 @@
       document.getElementById('form-date').value = ev.date;
       endDateInput.value = getEndDate(ev);
       // 반복 일정의 개별 회차는 하루짜리로 유지
-      endDateInput.disabled = Boolean(ev.repeatGroupId);
+      endDateInput.disabled = false;
       prevStartDate = ev.date;
       repeatLockedByEdit = Boolean(ev.repeatGroupId);
       isAllDayCheckbox.checked = Boolean(ev.isAllDay);
@@ -2648,8 +2683,11 @@
         repeatUntilBox.classList.remove('hidden');
         repeatUntilInput.value = ev.repeatUntil || ev.date;
         repeatUntilInput.disabled = true;
-        repeatEditNotice.innerText = isGoogleMode() ? '이 날짜만 수정됩니다 · 반복 규칙은 구글 캘린더에서 변경' : '반복 일정은 개별 일자별로 수정됩니다';
-        repeatEditNotice.classList.remove('hidden');
+        repeatEditNotice.innerText = '반복 주기·종료일은 구글 캘린더에서 변경';
+        repeatEditNotice.classList.toggle('hidden', !isGoogleMode());
+        setRepeatScope('this');
+        repeatScopeBox.classList.remove('hidden');
+        repeatScopeBox.classList.add('flex');
       } else {
         // 반복이 아닌 일정: 여기서 반복 일정으로 바꿀 수 있음
         repeatTypeSelect.value = 'none';
@@ -2660,6 +2698,8 @@
         repeatUntilInput.value = formatDateYMD(until);
         repeatUntilBox.classList.add('hidden');
         repeatEditNotice.classList.add('hidden');
+        repeatScopeBox.classList.add('hidden');
+        repeatScopeBox.classList.remove('flex');
       }
       updateMultiDayState();
 
@@ -2737,7 +2777,8 @@
           title, date, endDate, isAllDay, startTime, endTime, category, priority, familyMember, memo,
           completed: existing ? existing.completed : false,
           repeatType: existing && existing.repeatGroupId ? 'none' : repeatType,
-          repeatUntil
+          repeatUntil,
+          scope: existing && existing.repeatGroupId ? getRepeatScope() : 'this'
         };
         if (fields.repeatType !== 'none' && repeatUntil && repeatUntil < date) {
           showToast('반복 종료일은 시작일보다 이후여야 합니다.', 'danger');
@@ -2749,7 +2790,7 @@
           closeModal();
           await gcalSync({ force: true });
           showToast(existing
-            ? (fields.repeatType !== 'none' ? '반복 일정으로 바꿨습니다.' : '일정이 수정되었습니다.')
+            ? (fields.scope === 'following' ? '이 일정부터 이후 반복 일정을 모두 수정했습니다.' : fields.repeatType !== 'none' ? '반복 일정으로 바꿨습니다.' : '일정이 수정되었습니다.')
             : '구글 캘린더에 일정이 등록되었습니다.');
         });
         return;
@@ -2757,6 +2798,24 @@
 
       const existingLocal = id ? events.find(ev => ev.id === id) : null;
       const convertToSeries = Boolean(existingLocal && !existingLocal.repeatGroupId && repeatType !== 'none' && repeatUntil);
+
+      // 반복 일정 '이후 일정 모두': 같은 묶음에서 이 날짜 이후 회차를 함께 수정(날짜를 옮겼으면 같은 만큼 이동)
+      if (existingLocal && existingLocal.repeatGroupId && getRepeatScope() === 'following') {
+        const shift = daysBetween(existingLocal.date, date);
+        const span = daysBetween(date, endDate);
+        let changed = 0;
+        events = events.map(ev => {
+          if (ev.repeatGroupId !== existingLocal.repeatGroupId || ev.date < existingLocal.date) return ev;
+          changed++;
+          const newDate = addDaysStr(ev.date, shift);
+          return { ...ev, title, date: newDate, endDate: addDaysStr(newDate, span), isAllDay, startTime, endTime, category, priority, familyMember, memo };
+        });
+        selectedDateStr = date;
+        saveEvents();
+        closeModal();
+        showToast(`이 일정부터 반복 일정 ${changed}건을 수정했습니다.`);
+        return;
+      }
 
       if (id && !convertToSeries) {
         const index = events.findIndex(ev => ev.id === id);
@@ -3375,7 +3434,8 @@
         _gid: ge.id,
         _cal: member.calendarId,
         _readonly: member.writable === false,
-        _shared: shared
+        _shared: shared,
+        _origStart: ge.originalStartTime || null
       };
     }
 
@@ -3532,9 +3592,13 @@
         await gcalApi(`/calendars/${encId(target.calendarId)}/events`, { method: 'POST', body: appToGcal(fields) });
         return;
       }
+      if (existing.repeatGroupId && fields.scope === 'following') {
+        await gcalSaveFollowing(existing, fields, target);
+        return;
+      }
       let calId = existing._cal;
       if (calId !== target.calendarId) {
-        if (existing.repeatGroupId) throw new Error('반복 일정의 한 회차는 담당자(캘린더)를 바꿀 수 없습니다.');
+        if (existing.repeatGroupId) throw new Error("반복 일정의 한 회차만 담당자(캘린더)를 바꿀 수는 없습니다. '이후 일정 모두'를 선택해 주세요.");
         await gcalApi(`/calendars/${encId(calId)}/events/${encId(existing._gid)}/move`, {
           method: 'POST',
           params: { destination: target.calendarId }
@@ -3545,6 +3609,107 @@
         method: 'PATCH',
         body: appToGcal(Object.assign({}, fields, { _shared: existing._shared }), true)
       });
+    }
+
+    /* ----- 반복 일정 '이후 일정 모두' 수정 ----- */
+    function rruleParse(line) {
+      const kv = {};
+      line.replace(/^RRULE:/, '').split(';').filter(Boolean).forEach(part => {
+        const i = part.indexOf('=');
+        kv[part.slice(0, i).toUpperCase()] = part.slice(i + 1);
+      });
+      return kv;
+    }
+
+    function rruleBuild(kv) {
+      const order = ['FREQ', 'INTERVAL', 'WKST', 'BYDAY', 'BYMONTHDAY', 'BYMONTH', 'BYSETPOS', 'COUNT', 'UNTIL'];
+      const keys = Object.keys(kv).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
+      return 'RRULE:' + keys.map(k => `${k}=${kv[k]}`).join(';');
+    }
+
+    function utcBasic(date) {
+      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    }
+
+    // UNTIL 형식은 시작 형식(종일=날짜 / 시간=UTC 시각)과 맞아야 함
+    function convertUntil(until, toAllDay) {
+      const isDateTime = until.includes('T');
+      if (toAllDay) {
+        if (!isDateTime) return until;
+        const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/.exec(until);
+        if (!m) return until.slice(0, 8);
+        const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+        return formatDateYMD(d).replace(/-/g, '');
+      }
+      if (isDateTime) return until;
+      const d = new Date(`${until.slice(0, 4)}-${until.slice(4, 6)}-${until.slice(6, 8)}T23:59:59`);
+      return utcBasic(d);
+    }
+
+    async function gcalSaveFollowing(existing, fields, target) {
+      const cal = existing._cal;
+      const master = await gcalApi(`/calendars/${encId(cal)}/events/${encId(existing.repeatGroupId)}`);
+      const rules = (master.recurrence || []).slice();
+      const ruleIdx = rules.findIndex(r => r.startsWith('RRULE:'));
+      if (ruleIdx === -1) throw new Error('반복 규칙을 찾지 못했습니다. 구글 캘린더에서 수정해 주세요.');
+      const kv = rruleParse(rules[ruleIdx]);
+
+      // 이 회차의 원래 시작(옮겨진 회차라도 원래 자리 기준)
+      const orig = existing._origStart || (existing.isAllDay ? { date: existing.date } : { dateTime: new Date(`${existing.date}T${existing.startTime || '00:00'}:00`).toISOString() });
+      const origTime = orig.date ? new Date(`${orig.date}T00:00:00`).getTime() : new Date(orig.dateTime).getTime();
+      const masterTime = master.start.date ? new Date(`${master.start.date}T00:00:00`).getTime() : new Date(master.start.dateTime).getTime();
+      const isFirst = origTime <= masterTime;
+
+      // 새 반복 규칙: 주기는 그대로, 종료는 원래 종료일(또는 남은 횟수)
+      const newKv = Object.assign({}, kv);
+      if (kv.UNTIL) newKv.UNTIL = convertUntil(kv.UNTIL, fields.isAllDay);
+      if (kv.COUNT && !isFirst) {
+        let before = 0;
+        let pageToken;
+        do {
+          const res = await gcalApi(`/calendars/${encId(cal)}/events/${encId(existing.repeatGroupId)}/instances`, {
+            params: { timeMax: new Date(origTime).toISOString(), showDeleted: 'true', maxResults: '2500', pageToken }
+          });
+          before += ((res && res.items) || []).length;
+          pageToken = res && res.nextPageToken;
+        } while (pageToken);
+        newKv.COUNT = String(Math.max(1, Number(kv.COUNT) - before));
+      }
+      const otherRules = rules.filter(r => !r.startsWith('RRULE:'));
+      const newRule = rruleBuild(newKv);
+      const plain = Object.assign({}, fields, { repeatType: 'none', _shared: existing._shared });
+
+      // 첫 회차부터 바꾸는 경우 = 반복 전체 수정
+      if (isFirst && target.calendarId === cal) {
+        const body = appToGcal(plain, true);
+        body.recurrence = [newRule].concat(otherRules);
+        await gcalApi(`/calendars/${encId(cal)}/events/${encId(existing.repeatGroupId)}`, { method: 'PATCH', body });
+        return;
+      }
+
+      // 1) 이 날짜부터 새 반복 일정 만들기
+      const body = appToGcal(plain);
+      body.recurrence = [newRule];
+      const created = await gcalApi(`/calendars/${encId(target.calendarId)}/events`, { method: 'POST', body });
+
+      // 2) 원래 반복은 이 회차 전까지로 줄이기 (실패하면 새로 만든 것을 지워 중복 방지)
+      try {
+        if (isFirst) {
+          await gcalApi(`/calendars/${encId(cal)}/events/${encId(existing.repeatGroupId)}`, { method: 'DELETE' });
+        } else {
+          const masterKv = Object.assign({}, kv);
+          delete masterKv.COUNT;
+          masterKv.UNTIL = orig.date ? addDaysStr(orig.date, -1).replace(/-/g, '') : utcBasic(new Date(origTime - 1000));
+          const newRules = rules.slice();
+          newRules[ruleIdx] = rruleBuild(masterKv);
+          await gcalApi(`/calendars/${encId(cal)}/events/${encId(existing.repeatGroupId)}`, { method: 'PATCH', body: { recurrence: newRules } });
+        }
+      } catch (e) {
+        try {
+          await gcalApi(`/calendars/${encId(target.calendarId)}/events/${encId(created.id)}`, { method: 'DELETE' });
+        } catch (e2) {}
+        throw e;
+      }
     }
 
     function gcalToggleDone(ev, done, checkbox) {
