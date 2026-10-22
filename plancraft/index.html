@@ -3875,7 +3875,7 @@
 
     async function gcalLoadCalendars() {
       try {
-        const res = await gcalApi('/users/me/calendarList', { params: { maxResults: '250' } });
+        const res = await gcalApi('/users/me/calendarList', { params: { maxResults: '250', showHidden: 'true' } });
         gcalCalendars = ((res && res.items) || []).filter(c => !c.deleted);
         // 내 캘린더 → 편집 가능 → 보기 전용 순
         const rank = c => (c.primary ? 0 : (c.accessRole === 'owner' || c.accessRole === 'writer') ? 1 : 2);
@@ -3895,11 +3895,18 @@
       }
     }
 
+    const GCAL_LIST_HELP = `<div class="text-[10px] text-slate-400 leading-relaxed bg-slate-50 rounded-xl p-2 mt-1">
+        목록에 없는 캘린더는 <b>지금 연결된 계정의 구글 캘린더 목록</b>에 아직 없는 것입니다.<br>
+        · 다른 사람의 캘린더: 공유 초대 메일에서 <b>'이 캘린더 추가'</b>를 누르거나, 구글 캘린더 '다른 캘린더 ＋ → 캘린더 구독'에 상대 이메일 입력<br>
+        · 공유받은 계정과 위에 표시된 연결 계정이 같은지 확인<br>
+        · 추가한 뒤 '목록 새로고침'</div>`;
+
     function renderGcalModal() {
       const clientId = getGcalClientId();
       document.getElementById('gcal-client-status').innerText = clientId ? '· 입력됨' : '· 필요';
+      const primaryCal = gcalCalendars.find(c => c.primary);
       document.getElementById('gcal-conn-status').innerText = gcalConnected()
-        ? `연결됨 (약 ${Math.max(1, Math.round((gcalTokenExp - Date.now()) / 60000))}분 후 다시 연결 필요)`
+        ? `연결됨${primaryCal ? ` · ${primaryCal.id}` : ''} (약 ${Math.max(1, Math.round((gcalTokenExp - Date.now()) / 60000))}분 후 다시 연결 필요)`
         : '연결되지 않음';
       document.getElementById('gcal-connect-btn').innerText = gcalConnected() ? '다시 연결' : '구글로 연결';
       document.getElementById('gcal-disconnect-btn').classList.toggle('hidden', !isGoogleMode());
@@ -3958,6 +3965,7 @@
         });
         list.appendChild(row);
       });
+      list.insertAdjacentHTML('beforeend', GCAL_LIST_HELP);
     }
 
     document.getElementById('gcal-modal-close-btn').addEventListener('click', closeGcalModal);
